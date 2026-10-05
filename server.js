@@ -15,8 +15,14 @@ const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 const SECRET = process.env.APP_SECRET;
 if (!SECRET || SECRET.length < 32) {
-  console.error('Set APP_SECRET in .env to a random string of at least 32 characters.');
-  process.exit(1);
+  // Don't crash-loop on hosts like Railway: serve a page explaining what's missing.
+  const msg = 'Setup needed: add an APP_SECRET variable (a random string of at least 32 characters), then redeploy.';
+  console.error(msg);
+  require('http').createServer((_req, res) => {
+    res.writeHead(503, { 'Content-Type': 'text/html' });
+    res.end(`<!doctype html><meta name="viewport" content="width=device-width"><body style="font-family:system-ui;padding:40px;max-width:520px;margin:auto"><h2>CPSC membership cards</h2><p>${msg}</p></body>`);
+  }).listen(process.env.PORT || 3000);
+  return;
 }
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 const PHOTO_DIR = path.join(DATA_DIR, 'photos');
