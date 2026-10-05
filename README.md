@@ -24,6 +24,14 @@ Then sign up with an email in `ADMIN_EMAILS` — that account becomes an admin. 
 
 **Branding:** drop the club logo at `public/img/logo.png` (square-ish PNG with transparency works best). It's used in the site header and on both wallet passes. Colors live in the four variables at the top of `public/style.css`, and the pass colors in `.env` (`PASS_BG`, `PASS_FG`, `PASS_LABEL`).
 
+## Deploying on Railway
+
+1. railway.com → sign in with GitHub → **New Project → Deploy from GitHub repo** → pick this repo.
+2. Right-click the service → **Attach Volume**, mount path `/data`.
+3. **Variables**: `APP_SECRET`, `ADMIN_EMAILS`, `DATA_DIR=/data`, and the wallet values. For cert files, use the `_B64` variables (see `.env.example`). On Windows PowerShell you can copy a file as base64 with:
+   `[Convert]::ToBase64String([IO.File]::ReadAllBytes("signerCert.pem")) | Set-Clipboard`
+4. **Settings → Networking → Generate Domain** (or add `cards.cpsconline.com`), then set `PUBLIC_BASE_URL` to it.
+
 ## Hosting
 
 Needs a Node 18+ server with a persistent disk (SQLite database and photos live in `./data`). Railway, Render (with a disk), Fly.io, or a small VPS all work. It **must be served over HTTPS** — phone cameras won't open for the scanner otherwise, and the wallets require it. A subdomain like `cards.cpsconline.com` pointed at the host is the cleanest setup. Back up the `data/` folder.

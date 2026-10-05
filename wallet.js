@@ -21,12 +21,18 @@ const hexToRgb = (h) => {
 function readMaybe(p) {
   return p && fs.existsSync(p) ? fs.readFileSync(p) : null;
 }
+// Each secret can come from a file path (APPLE_WWDR_PATH) or, for hosts like
+// Railway, straight from a base64 environment variable (APPLE_WWDR_B64).
+function secret(name) {
+  const b64 = process.env[name + '_B64'];
+  if (b64) return Buffer.from(b64.replace(/\s+/g, ''), 'base64');
+  return readMaybe(process.env[name + '_PATH']);
+}
 
 // ---------- Apple ----------
 function appleConfigured() {
   return !!(process.env.APPLE_PASS_TYPE_ID && process.env.APPLE_TEAM_ID &&
-    readMaybe(process.env.APPLE_WWDR_PATH) && readMaybe(process.env.APPLE_SIGNER_CERT_PATH) &&
-    readMaybe(process.env.APPLE_SIGNER_KEY_PATH));
+    secret('APPLE_WWDR') && secret('APPLE_SIGNER_CERT') && secret('APPLE_SIGNER_KEY'));
 }
 
 async function logoPng(size) {
@@ -79,9 +85,9 @@ async function buildApplePass(user, qrValue) {
     files['thumbnail@2x.png'] = await sharp(photoPath).resize(180, 180).png().toBuffer();
   }
   const pass = new PKPass(files, {
-    wwdr: fs.readFileSync(process.env.APPLE_WWDR_PATH),
-    signerCert: fs.readFileSync(process.env.APPLE_SIGNER_CERT_PATH),
-    signerKey: fs.readFileSync(process.env.APPLE_SIGNER_KEY_PATH),
+    wwdr: secret('APPLE_WWDR'),
+    signerCert: secret('APPLE_SIGNER_CERT'),
+    signerKey: secret('APPLE_SIGNER_KEY'),
     signerKeyPassphrase: process.env.APPLE_SIGNER_KEY_PASSPHRASE || undefined,
   });
   return pass.getAsBuffer();
@@ -89,9 +95,9 @@ async function buildApplePass(user, qrValue) {
 
 // ---------- Google ----------
 function googleCreds() {
-  const p = process.env.GOOGLE_SERVICE_ACCOUNT_PATH;
-  if (!process.env.GOOGLE_ISSUER_ID || !readMaybe(p)) return null;
-  return JSON.parse(fs.readFileSync(p, 'utf8'));
+  const buf = secret('GOOGLE_SERVICE_ACCOUNT');
+  if (!process.env.GOOGLE_ISSUER_ID || !buf) return null;
+  return JSON.parse(buf.toString('utf8'));
 }
 
 function googleSaveUrl(user, qrValue, { photoUrl, logoUrl, baseUrl }) {
