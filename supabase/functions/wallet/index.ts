@@ -54,25 +54,37 @@ async function wwPassFor(p: Profile): Promise<WWPass> {
   if (cached) {
     try {
       const c = JSON.parse(await cached.text()) as WWPass;
-      if (c.v === 1 && c.name === p.name && c.serial) return c;
+      if (c.v === 2 && c.name === p.name && c.serial) return c;
     } catch { /* rebuild below */ }
   }
+  // Photo + exact club color only apply on WalletWallet's paid plan; the free plan ignores them.
+  const { data: thumb } = await bucket.download(`${p.id}/thumb.png`);
+  const thumbUri = thumb ? 'data:image/png;base64,' + Buffer.from(await thumb.arrayBuffer()).toString('base64') : undefined;
+  const now = new Date();
+  const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1; // ski season starts in summer
+  const season = `${y}–${String(y + 1).slice(2)}`;
+  const portal = (SITE_URL || 'https://mr-albenberg.github.io/cpsc') + '/card.html';
   const r = await fetch('https://api.walletwallet.dev/api/passes', {
     method: 'POST',
     headers: { Authorization: `Bearer ${WW_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      logoText: SHORT,
+      logoText: `${SHORT} ❄`,
       organizationName: ORG,
       description: `${ORG} Membership Card`,
       colorPreset: env('WALLETWALLET_COLOR') || 'blue',
+      colorPro: BG,
+      thumbnailURLPro: thumbUri,
+      headerFields: [{ label: 'SEASON', value: season }],
       primaryFields: [{ label: 'MEMBER', value: p.name }],
       secondaryFields: [
-        { label: 'STATUS', value: 'Active Member' },
+        { label: 'STATUS', value: 'Active ✓' },
         { label: 'MEMBER SINCE', value: String(new Date(p.created_at).getFullYear()) },
       ],
       backFields: [
-        { label: 'Email', value: p.email },
-        { label: 'Member portal', value: (SITE_URL || 'https://mr-albenberg.github.io/cpsc') + '/card.html' },
+        { label: 'Live to ski, love to party', value: `Show this card at ${SHORT} events, trips and sponsor discounts.` },
+        { label: 'Member', value: `${p.name} · ${p.email}` },
+        { label: 'Member portal', value: portal },
+        { label: 'Club site', value: 'https://cpsconline.com' },
       ],
       barcodeValue: QR(p.serial),
       barcodeFormat: 'QR',
@@ -91,7 +103,7 @@ async function wwPassFor(p: Profile): Promise<WWPass> {
       if (old.serial) await fetch(`https://api.walletwallet.dev/api/passes/${old.serial}`, { method: 'DELETE', headers: { Authorization: `Bearer ${WW_KEY}` } });
     } catch { /* ignore */ }
   }
-  const pass: WWPass = { serial: d.serialNumber, googleSaveUrl: d.googleSaveUrl, name: p.name, v: 1 };
+  const pass: WWPass = { serial: d.serialNumber, googleSaveUrl: d.googleSaveUrl, name: p.name, v: 2 };
   await bucket.upload(`${p.id}/pass.pkpass`, Buffer.from(d.applePass, 'base64'), { upsert: true, contentType: 'application/vnd.apple.pkpass' });
   await bucket.upload(`${p.id}/wallet.json`, JSON.stringify(pass), { upsert: true, contentType: 'application/json' });
   return pass;

@@ -150,7 +150,7 @@ boot('member').then(async (ctx) => {
 
   $('#newphoto').onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { await uploadPhotoFiles(p.id, await makePhotoFiles(f)); await loadPhoto(); showMsg($('#msg'), 'Photo saved.', true); }
+    try { await uploadPhotoFiles(p.id, await makePhotoFiles(f)); await sb.storage.from('photos').remove([`${p.id}/wallet.json`]); await loadPhoto(); showMsg($('#msg'), 'Photo saved.', true); }
     catch (err) { showMsg($('#msg'), err.message); }
   };
 }).catch(() => {});
