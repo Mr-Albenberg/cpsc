@@ -18,8 +18,18 @@
       <a class="wallet-btn disabled" id="apple" href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.27-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.06-.52 2.7-1.28z"/></svg>Add to Apple Wallet</a>
       <a class="wallet-btn disabled" id="google" href="#"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5V9H3z"/><path fill="#34A853" d="M3 9h18v3H3z"/><path fill="#FBBC04" d="M3 12h18v3H3z"/><path fill="#EA4335" d="M3 15h18v2.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg>Add to Google Wallet</a>
     </div>
-    <p class="muted center" id="walletNote" style="display:none">Wallet passes aren't switched on yet — you can still show the QR code from this page.</p>
+    <p class="muted center" style="margin-top:12px">You can also just show the QR code on this page.</p>
     <div class="msg" id="wmsg"></div>
+  </div>
+  <div class="sheet-backdrop" id="guide" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+      <button class="sheet-close" type="button" id="guideClose" aria-label="Close">✕</button>
+      <h2 id="guideTitle">Add to Wallet</h2>
+      <p class="muted" id="guideIntro"></p>
+      <button class="btn block" type="button" id="saveImg" style="margin-top:6px">Save card image</button>
+      <p class="muted center" id="saveNote" style="margin:8px 0 0"></p>
+      <ol class="steps" id="guideSteps"></ol>
+    </div>
   </div>
   <div class="panel">
     <h2>Profile</h2>
@@ -42,6 +52,68 @@ async function loadPhoto() {
   const url = await signedPhoto(me.session.user.id);
   $('#photo').src = url || 'img/logo.png';
   $('#needPhoto').style.display = url ? 'none' : 'block';
+}
+
+const GUIDES = {
+  apple: {
+    intro: 'Apple Wallet can make a pass from a picture of your QR code (iPhone with iOS 27 or later).',
+    steps: [
+      'Tap <b>Save card image</b> above, then <b>Save Image</b> so it goes to Photos.',
+      'Open the <b>Wallet</b> app and tap <b>+</b>.',
+      'Tap <b>Create a Pass</b>, then choose to add it from a photo and pick the image you just saved.',
+      'Pick the <b>Membership</b> template, name it <b>CPSC</b>, and tap the ✓.',
+    ],
+  },
+  google: {
+    intro: 'Google Wallet can make a pass from a picture of your QR code (Android).',
+    steps: [
+      'Tap <b>Save card image</b> above so it saves to your photos.',
+      'Open <b>Google Wallet</b> and tap <b>Add to Wallet</b>.',
+      'Choose <b>Everything else</b>, accept the prompt, and pick the image you just saved.',
+      'Check the details (name it <b>CPSC Membership</b>) and tap <b>Add</b>.',
+    ],
+  },
+};
+function openGuide(kind) {
+  const g = GUIDES[kind];
+  $('#guideTitle').textContent = kind === 'apple' ? 'Add to Apple Wallet' : 'Add to Google Wallet';
+  $('#guideIntro').textContent = g.intro;
+  $('#guideSteps').innerHTML = g.steps.map((t, i) => `<li><span>${i + 1}</span><div>${t}</div></li>`).join('');
+  $('#saveNote').textContent = '';
+  $('#guide').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+function closeGuide() { $('#guide').hidden = true; document.body.style.overflow = ''; }
+
+// A clean image of the card: big QR on white so the phone's scanner reads it reliably.
+async function cardImageBlob() {
+  const qr = $('#qr canvas');
+  const W = 900, H = 1180, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  x.fillStyle = '#0b1d33'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#7fd0ff'; x.font = '800 34px Montserrat, Arial, sans-serif'; x.textAlign = 'center';
+  x.fillText('CENTRAL PACIFIC SKI CLUB', W / 2, 90);
+  x.fillStyle = '#ffffff'; x.font = '900 64px Montserrat, Arial, sans-serif';
+  x.fillText(me.profile.name.toUpperCase().slice(0, 22), W / 2, 175);
+  x.fillStyle = '#ffffff'; x.beginPath(); x.roundRect(110, 240, 680, 680, 36); x.fill();
+  x.imageSmoothingEnabled = false;
+  x.drawImage(qr, 150, 280, 600, 600);
+  x.fillStyle = '#9fb6cc'; x.font = '600 30px Inter, Arial, sans-serif';
+  x.fillText('MEMBERSHIP CARD · SHOW AT EVENTS', W / 2, 1010);
+  x.fillText('LIVE TO SKI · LOVE TO PARTY', W / 2, 1060);
+  return new Promise((r) => c.toBlob(r, 'image/png'));
+}
+async function saveCardImage() {
+  const blob = await cardImageBlob();
+  const file = new File([blob], 'cpsc-membership-card.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'CPSC membership card' }); $('#saveNote').textContent = 'Saved? Now follow the steps below.'; return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
+  $('#saveNote').textContent = 'Image downloaded. Now follow the steps below.';
 }
 async function walletLink(kind) {
   try {
@@ -66,9 +138,15 @@ boot('member').then(async (ctx) => {
   if (/Android/.test(ua)) $('#apple').style.display = 'none';
   let status = {};
   try { status = await (await fetch(FN_URL + '?status=1')).json(); } catch {}
-  if (status.apple) { $('#apple').classList.remove('disabled'); $('#apple').onclick = (e) => { e.preventDefault(); walletLink('apple'); }; }
-  if (status.google) { $('#google').classList.remove('disabled'); $('#google').onclick = (e) => { e.preventDefault(); walletLink('google'); }; }
-  if (!status.apple && !status.google) $('#walletNote').style.display = 'block';
+  // Official signed passes when the wallet keys are set up; otherwise the free "add from a picture" route.
+  for (const kind of ['apple', 'google']) {
+    const btn = $('#' + kind);
+    btn.classList.remove('disabled');
+    btn.onclick = (e) => { e.preventDefault(); status[kind] ? walletLink(kind) : openGuide(kind); };
+  }
+  $('#guideClose').onclick = closeGuide;
+  $('#guide').onclick = (e) => { if (e.target.id === 'guide') closeGuide(); };
+  $('#saveImg').onclick = saveCardImage;
 
   $('#newphoto').onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;

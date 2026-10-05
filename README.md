@@ -40,8 +40,10 @@ Digital membership cards for Central Pacific Ski Club. Members sign up (approved
 
 Now sign up at `signup.html` with your email — you'll see **Members** and **Scan** in the menu.
 
-### 5. Wallet passes (optional, can do later)
-Until this is done the wallet buttons are greyed out and members show the QR from `card.html`.
+### 5. Wallet passes
+**Free (default):** the Add to Apple / Google Wallet buttons open a short guide. Members tap **Save card image**, then add it with Apple Wallet's **Create a Pass** (iPhone, iOS 27+) or Google Wallet's **Everything else** photo pass (Android). The pass carries the same QR code, so scanning works the same.
+
+**Optional, official one-tap passes:** if you later get an Apple Developer account and/or a Google Wallet issuer account, fill in the secrets below and the buttons switch to real signed passes automatically. The `wallet` function is already deployed.
 
 **Deploy the function:** Supabase → **Edge Functions → Deploy a new function → Via editor**, name it `wallet`, paste [`supabase/functions/wallet/index.ts`](supabase/functions/wallet/index.ts), deploy. Then open the function's **Details/Settings** and turn **off "Verify JWT"** (it checks logins itself).
 
