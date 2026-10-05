@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1d33"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/logo.png"><title>Create account · CPSC Membership</title></head>
+<body>
+<section class="hero"><div class="eyebrow">Members only</div><h1>Create Your Account</h1><p>Use the email you joined CPSC with. Only emails approved by the exec board can sign up.</p></section>
+<main class="narrow">
+<form class="panel" id="f">
+  <label>Your photo</label>
+  <div class="photo-pick"><label for="photo" class="preview" id="preview" style="margin:0;cursor:pointer"></label>
+    <div><label for="photo" class="btn ghost small" style="margin:0">Choose photo</label><div class="muted" style="margin-top:6px">A clear face photo — admins see it when they scan you in.</div></div>
+    <input type="file" id="photo" accept="image/*"></div>
+  <label for="name">Full name</label><input type="text" id="name" autocomplete="name" required maxlength="80">
+  <label for="email">Email</label><input type="email" id="email" autocomplete="email" required>
+  <label for="password">Password</label><input type="password" id="password" autocomplete="new-password" minlength="8" required>
+  <button class="btn block" type="submit" id="go">Create account</button>
+  <div class="msg" id="msg"></div>
+  <p class="muted center" style="margin-top:18px">Already have one? <a href="index.html">Log in</a></p>
+</form>
+</main>
+<footer>Central Pacific Ski Club · San Luis Obispo</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+boot('guest').then(() => {
+  $('#photo').onchange = (e) => {
+    const f = e.target.files[0];
+    if (f) { $('#preview').style.backgroundImage = 'url(' + URL.createObjectURL(f) + ')'; $('#preview').style.borderStyle = 'solid'; }
+  };
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault();
+    const name = $('#name').value.trim(), email = $('#email').value.trim().toLowerCase(), password = $('#password').value;
+    const file = $('#photo').files[0];
+    if (!file) return showMsg($('#msg'), 'Please add a photo of yourself for your card.');
+    if (password.length < 8) return showMsg($('#msg'), 'Password must be at least 8 characters.');
+    $('#go').disabled = true;
+    try {
+      const { data: ok } = await sb.rpc('is_email_approved', { p_email: email });
+      if (!ok) throw new Error("That email isn't on the approved member list yet. Ask an exec board member to approve it, then try again.");
+      const files = await makePhotoFiles(file);
+      const { data, error } = await sb.auth.signUp({
+        email, password, options: { data: { name }, emailRedirectTo: new URL('card.html', location.href).href },
+      });
+      if (error) {
+        if (/database error/i.test(error.message)) throw new Error("That email isn't on the approved member list yet.");
+        if (/registered|exists/i.test(error.message)) throw new Error('An account with that email already exists. Try logging in.');
+        throw error;
+      }
+      if (data.session) {
+        await uploadPhotoFiles(data.user.id, files);
+        location.href = 'card.html';
+      } else {
+        showMsg($('#msg'), 'Almost done! Check your email and tap the confirmation link, then log in. You\'ll add your photo again on your card page.', true);
+        $('#f').querySelectorAll('input').forEach((i) => (i.disabled = true));
+      }
+    } catch (err) { showMsg($('#msg'), err.message || 'Something went wrong.'); $('#go').disabled = false; }
+  };
+}).catch(() => {});
+</script>
+</body></html>

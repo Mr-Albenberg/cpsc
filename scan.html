@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1d33"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/logo.png"><title>Scan · CPSC Membership</title></head>
+<body>
+<section class="hero"><div class="eyebrow">Check-in</div><h1>Scan a Card</h1><p>Point the camera at a member's wallet QR code.</p></section>
+<main>
+<div class="scanner">
+  <div class="panel" style="padding:14px">
+    <div id="reader"></div>
+    <div class="center" style="margin-top:12px"><button class="btn" id="start" type="button">Start camera</button></div>
+  </div>
+  <div class="result" id="result">
+    <div class="status" id="status"></div>
+    <img id="rphoto" alt="">
+    <div class="name" id="rname"></div>
+    <div class="last" id="rlast"></div>
+    <p class="muted" id="rmeta"></p>
+    <button class="btn dark" id="next" type="button">Scan next</button>
+  </div>
+</div>
+</main>
+<footer>Central Pacific Ski Club · San Luis Obispo</footer>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+boot('admin').then(() => {
+  const scanner = new Html5Qrcode('reader');
+  let busy = false, timer;
+  const beep = (ok) => {
+    try { const c = new AudioContext(), o = c.createOscillator(); o.frequency.value = ok ? 880 : 220; o.connect(c.destination); o.start(); o.stop(c.currentTime + 0.15); } catch {}
+    navigator.vibrate?.(ok ? 80 : [60, 40, 60]);
+  };
+  function bad(text) {
+    $('#result').className = 'result show bad';
+    $('#status').textContent = '✕ Not valid';
+    $('#rphoto').style.display = 'none';
+    $('#rname').textContent = 'Not recognized';
+    $('#rlast').textContent = text; $('#rmeta').textContent = '';
+    beep(false);
+  }
+  async function onScan(code) {
+    if (busy) return; busy = true;
+    try { scanner.pause(true); } catch {}
+    const { data: r, error } = await sb.rpc('scan_card', { p_code: code });
+    if (error) bad(error.message);
+    else if (!r.valid) bad(r.error);
+    else {
+      $('#result').className = 'result show';
+      $('#status').textContent = '✓ Valid member';
+      $('#rname').textContent = r.member.name;
+      $('#rlast').innerHTML = 'Last scanned<strong>' + esc(r.lastScan ? fmtTime(r.lastScan) : 'First scan — welcome!') + '</strong>';
+      $('#rmeta').textContent = (r.lastScannedBy ? 'by ' + r.lastScannedBy + ' · ' : '') + r.totalScans + ' total check-in' + (r.totalScans === 1 ? '' : 's');
+      const url = await signedPhoto(r.member.id);
+      $('#rphoto').style.display = url ? '' : 'none';
+      if (url) $('#rphoto').src = url;
+      beep(true);
+    }
+    $('#result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    clearTimeout(timer); timer = setTimeout(next, 10000);
+  }
+  function next() {
+    clearTimeout(timer); $('#result').className = 'result'; busy = false;
+    try { scanner.resume(); } catch {}
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  $('#next').onclick = next;
+  $('#start').onclick = async () => {
+    try {
+      await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } }, onScan);
+      $('#start').style.display = 'none';
+    } catch (e) { alert('Could not open the camera: ' + e + '\nAllow camera access for this site and try again.'); }
+  };
+}).catch(() => {});
+</script>
+</body></html>

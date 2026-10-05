@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1d33"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/logo.png"><title>My card · CPSC Membership</title></head>
+<body>
+<section class="hero"><div class="eyebrow">Your membership</div><h1 id="hi">Hey there</h1><p>Add your card to your wallet and show the QR code at events and trips.</p></section>
+<main>
+<div class="grid">
+  <div class="panel">
+    <div class="notice" id="needPhoto" style="display:none"><strong>Add your photo to finish your card</strong>Admins see it when they scan you in. Use "Choose photo" on this page.</div>
+    <div class="member-card">
+      <div class="top"><span>CPSC</span><small>MEMBERSHIP CARD</small></div>
+      <div class="who"><img id="photo" alt=""><div><div class="label">MEMBER</div><div class="name" id="name"></div></div></div>
+      <div class="qr"><div id="qr"></div></div>
+      <div class="foot">Live to ski · Love to party</div>
+    </div>
+    <div class="wallet-buttons">
+      <a class="wallet-btn disabled" id="apple" href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.27-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.06-.52 2.7-1.28z"/></svg>Add to Apple Wallet</a>
+      <a class="wallet-btn disabled" id="google" href="#"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5V9H3z"/><path fill="#34A853" d="M3 9h18v3H3z"/><path fill="#FBBC04" d="M3 12h18v3H3z"/><path fill="#EA4335" d="M3 15h18v2.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg>Add to Google Wallet</a>
+    </div>
+    <p class="muted center" id="walletNote" style="display:none">Wallet passes aren't switched on yet — you can still show the QR code from this page.</p>
+    <div class="msg" id="wmsg"></div>
+  </div>
+  <div class="panel">
+    <h2>Profile</h2>
+    <p class="muted" id="email"></p>
+    <label>Photo</label>
+    <div class="photo-pick"><label for="newphoto" class="btn ghost small" style="margin:0">Choose photo</label><input type="file" id="newphoto" accept="image/*"></div>
+    <div class="msg" id="msg"></div>
+    <p class="muted" style="margin-top:18px">Changed your photo? Re-add the card to your wallet so it shows the new one.</p>
+  </div>
+</div>
+</main>
+<footer>Central Pacific Ski Club · San Luis Obispo</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+let me;
+async function loadPhoto() {
+  const url = await signedPhoto(me.session.user.id);
+  $('#photo').src = url || 'img/logo.png';
+  $('#needPhoto').style.display = url ? 'none' : 'block';
+}
+async function walletLink(kind) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token }, body: JSON.stringify({ kind }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.url) throw new Error(d.error || 'Could not create the wallet pass.');
+    location.href = d.url;
+  } catch (err) { showMsg($('#wmsg'), err.message); }
+}
+boot('member').then(async (ctx) => {
+  me = ctx;
+  const p = ctx.profile;
+  $('#hi').textContent = 'Hey, ' + p.name.split(' ')[0];
+  $('#name').textContent = p.name;
+  $('#email').textContent = p.email;
+  new QRCode($('#qr'), { text: 'CPSC1:' + p.serial, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+  loadPhoto();
+
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua)) $('#google').style.display = 'none';
+  if (/Android/.test(ua)) $('#apple').style.display = 'none';
+  let status = {};
+  try { status = await (await fetch(FN_URL + '?status=1')).json(); } catch {}
+  if (status.apple) { $('#apple').classList.remove('disabled'); $('#apple').onclick = (e) => { e.preventDefault(); walletLink('apple'); }; }
+  if (status.google) { $('#google').classList.remove('disabled'); $('#google').onclick = (e) => { e.preventDefault(); walletLink('google'); }; }
+  if (!status.apple && !status.google) $('#walletNote').style.display = 'block';
+
+  $('#newphoto').onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try { await uploadPhotoFiles(p.id, await makePhotoFiles(f)); await loadPhoto(); showMsg($('#msg'), 'Photo saved.', true); }
+    catch (err) { showMsg($('#msg'), err.message); }
+  };
+}).catch(() => {});
+</script>
+</body></html>

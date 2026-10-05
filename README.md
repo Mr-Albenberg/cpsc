@@ -1,66 +1,86 @@
 # CPSC Membership Cards
 
-Digital membership cards for Central Pacific Ski Club: members sign up (approved emails only), get a card with their photo and a QR code, and add it to Apple Wallet or Google Wallet. Exec board admins scan the QR to see the member's photo, name and when they were last scanned.
+Digital membership cards for Central Pacific Ski Club. Members sign up (approved emails only), get a card with their photo and a QR code, and add it to Apple Wallet or Google Wallet. Exec board admins scan the QR to see the member's photo, name and when they were last scanned.
+
+- **Website:** static pages hosted free on **GitHub Pages** (this repo).
+- **Accounts, photos, scan history:** a free **Supabase** project.
+- **Wallet passes:** a small Supabase function (`supabase/functions/wallet`) that signs passes with keys stored only in Supabase.
 
 ## Pages
 
-| URL | Who | What |
+| Page | Who | What |
 |---|---|---|
-| `/login` | everyone | Log in |
-| `/signup` | approved emails | Create account with name, email, password, photo |
-| `/card` | members | Card with QR + "Add to Apple / Google Wallet" |
-| `/admin` | admins | Approve emails (bulk paste), see members, last scan, make/remove admins, remove accounts |
-| `/admin/scan` | admins | Phone camera scanner — shows photo, name, last scanned time (and by whom), total check-ins |
+| `index.html` | everyone | Log in, forgot password |
+| `signup.html` | approved emails | Create account with name, email, password, photo |
+| `card.html` | members | Card with QR + Add to Apple / Google Wallet |
+| `admin.html` | admins | Approve emails (bulk paste), see members and last scan, make/remove admins, remove accounts |
+| `scan.html` | admins | Phone camera scanner — photo, name, last scanned (and by whom), total check-ins |
 
-## Quick start
+## Setup (about 15 minutes, all in the browser)
 
-```bash
-npm install
-cp .env.example .env      # fill in APP_SECRET, PUBLIC_BASE_URL, ADMIN_EMAILS
-npm start
-```
-
-Then sign up with an email in `ADMIN_EMAILS` — that account becomes an admin. Approve everyone else from `/admin`.
-
-**Branding:** drop the club logo at `public/img/logo.png` (square-ish PNG with transparency works best). It's used in the site header and on both wallet passes. Colors live in the four variables at the top of `public/style.css`, and the pass colors in `.env` (`PASS_BG`, `PASS_FG`, `PASS_LABEL`).
-
-## Deploying on Railway
-
-1. railway.com → sign in with GitHub → **New Project → Deploy from GitHub repo** → pick this repo.
-2. Right-click the service → **Attach Volume**, mount path `/data`.
-3. **Variables**: `APP_SECRET`, `ADMIN_EMAILS`, `DATA_DIR=/data`, and the wallet values. For cert files, use the `_B64` variables (see `.env.example`). On Windows PowerShell you can copy a file as base64 with:
-   `[Convert]::ToBase64String([IO.File]::ReadAllBytes("signerCert.pem")) | Set-Clipboard`
-4. **Settings → Networking → Generate Domain** (or add `cards.cpsconline.com`), then set `PUBLIC_BASE_URL` to it.
-
-## Hosting
-
-Needs a Node 18+ server with a persistent disk (SQLite database and photos live in `./data`). Railway, Render (with a disk), Fly.io, or a small VPS all work. It **must be served over HTTPS** — phone cameras won't open for the scanner otherwise, and the wallets require it. A subdomain like `cards.cpsconline.com` pointed at the host is the cleanest setup. Back up the `data/` folder.
-
-## Apple Wallet setup (Apple Developer account required)
-
-1. In developer.apple.com → Certificates, IDs & Profiles → Identifiers, create a **Pass Type ID** (e.g. `pass.com.cpsconline.membership`).
-2. Create a **Pass Type ID Certificate** for it (you'll upload a CSR made in Keychain Access), download the `.cer`, and export it from Keychain as `.p12`.
-3. Convert to PEM:
-   ```bash
-   openssl pkcs12 -in Certificates.p12 -clcerts -nokeys -out certs/signerCert.pem -legacy
-   openssl pkcs12 -in Certificates.p12 -nocerts -out certs/signerKey.pem -legacy
+### 1. Create the Supabase project
+1. Sign up at **supabase.com** → **New project** (free plan is fine).
+2. Open **SQL Editor**, paste all of [`supabase/schema.sql`](supabase/schema.sql), click **Run**.
+3. Still in SQL Editor, make yourself the first admin (use your email):
+   ```sql
+   insert into public.approved_emails (email, make_admin) values ('you@example.com', true);
    ```
-4. Download Apple's **WWDR G4** certificate from apple.com/certificateauthority and convert: `openssl x509 -inform der -in AppleWWDRCAG4.cer -out certs/wwdr.pem`
-5. Fill in the `APPLE_*` values in `.env` (Team ID is on your developer account's Membership page).
 
-## Google Wallet setup (free)
+### 2. Connect the website
+1. In Supabase go to **Project Settings → API** (or the **Connect** button) and copy the **Project URL** and the **anon / publishable key**.
+2. In this repo, edit [`config.js`](config.js) and paste them in. (Both are meant to be public — the security rules in the database decide what anyone can do.)
 
-1. Go to pay.google.com/business/console → Google Wallet API → sign up as an issuer. Note your **Issuer ID**.
-2. In Google Cloud Console, enable the **Google Wallet API**, create a **service account**, and download its JSON key to `certs/google-service-account.json`.
-3. Back in the Wallet console → Users, invite the service account's email with **Developer** access.
-4. Fill in `GOOGLE_ISSUER_ID`. Passes work right away for your own test accounts; request **publishing access** in the console before members use it.
+### 3. Turn on GitHub Pages
+1. Repo **Settings → Pages** → Source: **Deploy from a branch** → Branch **main**, folder **/ (root)** → Save.
+2. After a minute the site is live at **https://mr-albenberg.github.io/cpsc/**.
 
-Until either wallet is configured, its button is greyed out and members can still show the QR from `/card`.
+### 4. Point Supabase at the site
+1. Supabase → **Authentication → URL Configuration**: set **Site URL** to `https://mr-albenberg.github.io/cpsc/` and add `https://mr-albenberg.github.io/cpsc/*` under **Redirect URLs**.
+2. Optional: **Authentication → Sign In / Providers → Email** → turn off **Confirm email**. Only approved emails can sign up anyway, and members can then add their photo right away instead of after confirming.
 
-## How it works / security notes
+Now sign up at `signup.html` with your email — you'll see **Members** and **Scan** in the menu.
 
-- QR codes contain `CPSC1:<random card id>.<signature>`, signed with `APP_SECRET`. They can't be guessed or forged, and a removed member's card scans as invalid. **Never change `APP_SECRET` after launch** or every existing card stops working.
-- Passwords are bcrypt-hashed; logins are throttled after 10 tries per 15 min.
-- Removing an email from the approved list blocks *new* sign-ups only. Use "Remove" on the member to revoke an existing card.
-- Google downloads the member photo from a signed, unguessable URL (`/p/...`) so it can show it on the pass.
-- If a member changes their photo, they should re-add the pass. (Google Wallet keeps the original object; to refresh it automatically you'd add a call to the Wallet REST API.)
+### 5. Wallet passes (optional, can do later)
+Until this is done the wallet buttons are greyed out and members show the QR from `card.html`.
+
+**Deploy the function:** Supabase → **Edge Functions → Deploy a new function → Via editor**, name it `wallet`, paste [`supabase/functions/wallet/index.ts`](supabase/functions/wallet/index.ts), deploy. Then open the function's **Details/Settings** and turn **off "Verify JWT"** (it checks logins itself).
+
+**Add secrets:** Edge Functions → **Secrets**:
+
+| Name | Value |
+|---|---|
+| `SITE_URL` | `https://mr-albenberg.github.io/cpsc` |
+| `APPLE_PASS_TYPE_ID` | e.g. `pass.com.cpsconline.membership` |
+| `APPLE_TEAM_ID` | your Apple Team ID |
+| `APPLE_WWDR_B64` | base64 of `wwdr.pem` |
+| `APPLE_SIGNER_CERT_B64` | base64 of `signerCert.pem` |
+| `APPLE_SIGNER_KEY_B64` | base64 of `signerKey.pem` |
+| `APPLE_SIGNER_KEY_PASSPHRASE` | only if your key has one |
+| `GOOGLE_ISSUER_ID` | from the Google Pay & Wallet Console |
+| `GOOGLE_SERVICE_ACCOUNT_B64` | base64 of the service account JSON key |
+
+Copy a file as base64 on Windows (PowerShell): `[Convert]::ToBase64String([IO.File]::ReadAllBytes("signerCert.pem")) | Set-Clipboard`
+
+**Apple certificates** (needs an Apple Developer account):
+1. developer.apple.com → Certificates, IDs & Profiles → Identifiers → new **Pass Type ID**.
+2. Create a **Pass Type ID Certificate** for it, download it, export as `.p12` from Keychain (Mac) or convert with OpenSSL.
+3. `openssl pkcs12 -in cert.p12 -clcerts -nokeys -out signerCert.pem -legacy` and `openssl pkcs12 -in cert.p12 -nocerts -out signerKey.pem -legacy`
+4. Download Apple **WWDR G4** from apple.com/certificateauthority: `openssl x509 -inform der -in AppleWWDRCAG4.cer -out wwdr.pem`
+
+**Google Wallet** (free):
+1. pay.google.com/business/console → Google Wallet API → note your **Issuer ID**.
+2. Google Cloud Console → enable **Google Wallet API** → create a **service account** → download a JSON key.
+3. Wallet console → **Users** → invite the service account email as **Developer**. Request publishing access before members use it.
+
+**Never commit certificate or key files to this repo** — it's public.
+
+## Branding
+- Replace `img/logo.png` with the club logo (square PNG, ~512px). It's used in the header and on both wallet passes.
+- Colors are the four variables at the top of `assets/style.css`. Pass colors can be set with the `PASS_BG`, `PASS_FG`, `PASS_LABEL` function secrets.
+
+## How it works / security
+- The QR code holds the member's random card ID (`CPSC1:<uuid>`). Only the member and admins can read it, it can't be guessed, and removing a member makes their card scan as invalid.
+- The approved-email rule is enforced inside the database, so it can't be bypassed from the browser.
+- Members can only see their own profile and photo. Approved list, member list, other photos and scanning are admin-only.
+- Removing an email from the approved list blocks *new* sign-ups only. Use **Remove** on the member to revoke an existing card.
+- If a member changes their photo they should re-add the pass.

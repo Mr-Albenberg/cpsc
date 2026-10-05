@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1d33"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/logo.png"><title>Reset password · CPSC Membership</title></head>
+<body>
+<section class="hero"><div class="eyebrow">Account</div><h1>New Password</h1><p>Choose a new password for your CPSC account.</p></section>
+<main class="narrow">
+<form class="panel" id="f">
+  <label for="password">New password</label><input type="password" id="password" autocomplete="new-password" minlength="8" required>
+  <button class="btn block" type="submit" id="go">Save password</button>
+  <div class="msg" id="msg"></div>
+</form>
+</main>
+<footer>Central Pacific Ski Club · San Luis Obispo</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+boot('any').then(async () => {
+  await new Promise((r) => setTimeout(r, 300)); // let Supabase finish reading the email link
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) showMsg($('#msg'), 'This reset link has expired. Go back to the login page and request a new one.');
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault();
+    const { error } = await sb.auth.updateUser({ password: $('#password').value });
+    if (error) return showMsg($('#msg'), error.message);
+    showMsg($('#msg'), 'Password updated. Taking you to your card…', true);
+    setTimeout(() => (location.href = 'card.html'), 1200);
+  };
+}).catch(() => {});
+</script>
+</body></html>
