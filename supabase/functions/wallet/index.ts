@@ -12,7 +12,10 @@ import { Buffer } from 'node:buffer';
 
 const env = (k: string) => Deno.env.get(k) ?? '';
 const SUPABASE_URL = env('SUPABASE_URL').replace(/\/$/, '');
-const SERVICE_KEY = env('SUPABASE_SERVICE_ROLE_KEY');
+// Newer projects expose secret keys as a JSON map; older ones as SUPABASE_SERVICE_ROLE_KEY.
+const SERVICE_KEY = env('SUPABASE_SERVICE_ROLE_KEY') || (() => {
+  try { return Object.values(JSON.parse(env('SUPABASE_SECRET_KEYS') || '{}'))[0] as string || ''; } catch { return ''; }
+})();
 const SITE_URL = env('SITE_URL').replace(/\/$/, ''); // e.g. https://mr-albenberg.github.io/cpsc
 const ORG = env('ORG_NAME') || 'Central Pacific Ski Club';
 const SHORT = env('ORG_SHORT') || 'CPSC';
