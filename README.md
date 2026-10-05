@@ -43,6 +43,8 @@ Now sign up at `signup.html` with your email — you'll see **Members** and **Sc
 ### 5. Wallet passes
 **Free (default):** the Add to Apple / Google Wallet buttons open a short guide. Members tap **Save card image**, then add it with Apple Wallet's **Create a Pass** (iPhone, iOS 27+) or Google Wallet's **Everything else** photo pass (Android). The pass carries the same QR code, so scanning works the same.
 
+**One-tap passes for free (recommended):** sign up at walletwallet.dev, create an API key, and add it as the Edge Function secret `WALLETWALLET_API_KEY`. The buttons then add a real pass to Apple Wallet / Google Wallet in one tap (free plan: 1,000 passes/month; each member uses one). Optional secret `WALLETWALLET_COLOR`: dark, blue (default), green, red, purple or orange.
+
 **Optional, official one-tap passes:** if you later get an Apple Developer account and/or a Google Wallet issuer account, fill in the secrets below and the buttons switch to real signed passes automatically. The `wallet` function is already deployed.
 
 **Deploy the function:** Supabase → **Edge Functions → Deploy a new function → Via editor**, name it `wallet`, paste [`supabase/functions/wallet/index.ts`](supabase/functions/wallet/index.ts), deploy. Then open the function's **Details/Settings** and turn **off "Verify JWT"** (it checks logins itself).

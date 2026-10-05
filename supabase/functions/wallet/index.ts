@@ -41,6 +41,62 @@ export const appleReady = () =>
   !!(env('APPLE_PASS_TYPE_ID') && env('APPLE_TEAM_ID') && secret('APPLE_WWDR') && secret('APPLE_SIGNER_CERT') && secret('APPLE_SIGNER_KEY') && SITE_URL);
 export const googleReady = () => !!(env('GOOGLE_ISSUER_ID') && secret('GOOGLE_SERVICE_ACCOUNT') && SITE_URL);
 
+// ---------- WalletWallet (free hosted signing, no Apple/Google accounts needed) ----------
+// Used for whichever wallet doesn't have its own keys configured above.
+const WW_KEY = env('WALLETWALLET_API_KEY');
+export const wwReady = () => !!WW_KEY;
+type WWPass = { serial: string; googleSaveUrl: string; name: string; v: number };
+
+// Each member gets one pass, created on first tap and reused after (cached in their storage folder).
+async function wwPassFor(p: Profile): Promise<WWPass> {
+  const bucket = db.storage.from('photos');
+  const { data: cached } = await bucket.download(`${p.id}/wallet.json`);
+  if (cached) {
+    try {
+      const c = JSON.parse(await cached.text()) as WWPass;
+      if (c.v === 1 && c.name === p.name && c.serial) return c;
+    } catch { /* rebuild below */ }
+  }
+  const r = await fetch('https://api.walletwallet.dev/api/passes', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${WW_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      logoText: SHORT,
+      organizationName: ORG,
+      description: `${ORG} Membership Card`,
+      colorPreset: env('WALLETWALLET_COLOR') || 'blue',
+      primaryFields: [{ label: 'MEMBER', value: p.name }],
+      secondaryFields: [
+        { label: 'STATUS', value: 'Active Member' },
+        { label: 'MEMBER SINCE', value: String(new Date(p.created_at).getFullYear()) },
+      ],
+      backFields: [
+        { label: 'Email', value: p.email },
+        { label: 'Member portal', value: (SITE_URL || 'https://mr-albenberg.github.io/cpsc') + '/card.html' },
+      ],
+      barcodeValue: QR(p.serial),
+      barcodeFormat: 'QR',
+      barcodeAltText: p.name.slice(0, 128),
+    }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.serialNumber) {
+    console.error('WalletWallet error', r.status, d);
+    throw new Error(r.status === 429 ? 'The free wallet-pass limit for this month is used up. Try again next month.' : 'The wallet service is unavailable right now.');
+  }
+  // Remove the member's previous pass, if any, so only one stays live
+  if (cached) {
+    try {
+      const old = JSON.parse(await cached.text()) as WWPass;
+      if (old.serial) await fetch(`https://api.walletwallet.dev/api/passes/${old.serial}`, { method: 'DELETE', headers: { Authorization: `Bearer ${WW_KEY}` } });
+    } catch { /* ignore */ }
+  }
+  const pass: WWPass = { serial: d.serialNumber, googleSaveUrl: d.googleSaveUrl, name: p.name, v: 1 };
+  await bucket.upload(`${p.id}/pass.pkpass`, Buffer.from(d.applePass, 'base64'), { upsert: true, contentType: 'application/vnd.apple.pkpass' });
+  await bucket.upload(`${p.id}/wallet.json`, JSON.stringify(pass), { upsert: true, contentType: 'application/json' });
+  return pass;
+}
+
 const QR = (serial: string) => `CPSC1:${serial}`;
 const rgb = (h: string) => {
   const n = parseInt(h.replace('#', ''), 16);
@@ -165,16 +221,24 @@ export async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   try {
     // Which wallets are switched on (used to enable the buttons on the card page)
-    if (req.method === 'GET' && url.searchParams.has('status')) return json({ apple: appleReady(), google: googleReady() });
+    if (req.method === 'GET' && url.searchParams.has('status')) return json({ apple: appleReady() || wwReady(), google: googleReady() || wwReady() });
 
     // Apple pass download via short-lived link
     if (req.method === 'GET' && url.searchParams.has('t')) {
       const id = await readToken(url.searchParams.get('t')!);
       const p = id && (await profileFor(id));
       if (!p) return new Response('This link has expired. Go back to your card and tap Add to Apple Wallet again.', { status: 410, headers: cors });
-      const { data: thumbBlob } = await db.storage.from('photos').download(`${p.id}/thumb.png`);
-      const thumb = thumbBlob ? Buffer.from(await thumbBlob.arrayBuffer()) : null;
-      const buf = await buildApplePass(p, thumb, await logo());
+      let buf: Buffer;
+      if (appleReady()) {
+        const { data: thumbBlob } = await db.storage.from('photos').download(`${p.id}/thumb.png`);
+        const thumb = thumbBlob ? Buffer.from(await thumbBlob.arrayBuffer()) : null;
+        buf = await buildApplePass(p, thumb, await logo());
+      } else {
+        await wwPassFor(p);
+        const { data: file } = await db.storage.from('photos').download(`${p.id}/pass.pkpass`);
+        if (!file) throw new Error('pass file missing');
+        buf = Buffer.from(await file.arrayBuffer());
+      }
       return new Response(buf, {
         headers: { ...cors, 'Content-Type': 'application/vnd.apple.pkpass', 'Content-Disposition': 'attachment; filename="cpsc-membership.pkpass"' },
       });
@@ -189,11 +253,13 @@ export async function handler(req: Request): Promise<Response> {
       const { kind } = await req.json().catch(() => ({}));
 
       if (kind === 'apple') {
-        if (!appleReady()) return json({ error: 'Apple Wallet is not set up yet.' }, 503);
+        if (!appleReady() && !wwReady()) return json({ error: 'Apple Wallet is not set up yet.' }, 503);
+        if (!appleReady()) await wwPassFor(p); // create it now so the download link is instant
         return json({ url: `${SUPABASE_URL}/functions/v1/wallet?t=${encodeURIComponent(await makeToken(p.id))}` });
       }
       if (kind === 'google') {
-        if (!googleReady()) return json({ error: 'Google Wallet is not set up yet.' }, 503);
+        if (!googleReady() && !wwReady()) return json({ error: 'Google Wallet is not set up yet.' }, 503);
+        if (!googleReady()) return json({ url: (await wwPassFor(p)).googleSaveUrl });
         // Google's servers fetch the photo from this long-lived private link to show it on the pass
         const { data: signed } = await db.storage.from('photos').createSignedUrl(`${p.id}/photo.jpg`, 60 * 60 * 24 * 365 * 5);
         return json({ url: await googleSaveUrl(p, signed?.signedUrl ?? null) });
@@ -203,7 +269,8 @@ export async function handler(req: Request): Promise<Response> {
     return json({ error: 'Not found' }, 404);
   } catch (e) {
     console.error(e);
-    return json({ error: 'Could not build the wallet pass. Check the function logs.' }, 500);
+    const msg = e instanceof Error && /wallet service|limit/.test(e.message) ? e.message : 'Could not build the wallet pass. Try again in a minute.';
+    return json({ error: msg }, 500);
   }
 }
 

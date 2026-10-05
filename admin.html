@@ -89,7 +89,7 @@ boot('admin').then(({ profile }) => {
       res = await sb.from('approved_emails').delete().eq('email', b.dataset.unapprove);
     } else if (b.dataset.del) {
       if (!confirm(`Remove ${b.dataset.name}'s account? Their card will stop scanning as valid.`)) return;
-      await sb.storage.from('photos').remove([`${b.dataset.del}/photo.jpg`, `${b.dataset.del}/thumb.png`]);
+      await sb.storage.from('photos').remove([`${b.dataset.del}/photo.jpg`, `${b.dataset.del}/thumb.png`, `${b.dataset.del}/wallet.json`, `${b.dataset.del}/pass.pkpass`]);
       res = await sb.rpc('delete_member', { p_id: b.dataset.del });
     } else if (b.dataset.admin) {
       res = await sb.rpc('set_admin', { p_id: b.dataset.admin, p_value: b.dataset.to === '1' });
