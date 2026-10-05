@@ -27,6 +27,12 @@ create table if not exists public.scans (
 );
 create index if not exists scans_user_time on public.scans(user_id, scanned_at desc);
 
+-- Table access for logged-in users (row-level security below decides which rows)
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.approved_emails to authenticated;
+grant select on public.profiles, public.scans to authenticated;
+revoke all on public.approved_emails, public.profiles, public.scans from anon;
+
 alter table public.approved_emails enable row level security;
 alter table public.profiles        enable row level security;
 alter table public.scans           enable row level security;
