@@ -5,7 +5,24 @@
 <body>
 <section class="hero"><div class="eyebrow">Exec board</div><h1>Members</h1><p>Approve emails so people can sign up, and see who's been scanned in.</p></section>
 <main>
-<div class="grid">
+<div class="panel code-panel">
+    <div class="code-now">
+      <div class="code-eyebrow">This week's check-in code</div>
+      <div class="code-big" id="codeNow">…</div>
+      <div class="muted" id="codeMeta"></div>
+      <p class="muted" style="margin-top:12px">Real cards show this on the wallet pass and on the live website card. A card with an old code, or no code, is a copy.</p>
+    </div>
+    <form class="code-form" id="cf">
+      <label for="cword">New code word</label>
+      <div class="code-input"><input type="text" id="cword" maxlength="14" autocomplete="off" placeholder="e.g. BLUEBIRD"><button type="button" class="btn ghost small" id="crand">🎲 Random</button></div>
+      <label>Emoji</label>
+      <div class="emoji-row" id="cemoji"></div>
+      <button class="btn block" type="submit" id="csave">Save &amp; update all passes</button>
+      <p class="muted center" id="cnote" style="margin:10px 0 0"></p>
+      <div class="msg" id="cmsg"></div>
+    </form>
+  </div>
+  <div class="grid">
     <form class="panel" id="af">
       <h2>Approve emails</h2>
       <p class="muted">Paste one or many — separated by commas, spaces or new lines.</p>
@@ -64,9 +81,55 @@ async function load() {
     drawMembers();
   }
 }
+const CODE_WORDS = ['POWDER', 'BLUEBIRD', 'GNARLY', 'CORDUROY', 'FIRST CHAIR', 'FRESH TRACKS', 'SEND IT', 'APRES', 'FACE SHOT', 'YARD SALE', 'HOT LAPS', 'GONDOLA', 'MOGUL', 'SKI BUM', 'PARK RAT', 'TREE RUN', 'COLD SMOKE', 'SNOWBALL', 'GROOMER', 'FROSTBITE'];
+const CODE_EMOJI = ['🏔️', '🎿', '🏂', '❄️', '⛷️', '🌲', '🔥', '☀️', '🌊', '🐻', '🦅', '⚡'];
+let pickedEmoji = CODE_EMOJI[0], passCount = 0;
+function drawEmoji() {
+  $('#cemoji').innerHTML = CODE_EMOJI.map((e) => `<button type="button" class="emoji-btn${e === pickedEmoji ? ' on' : ''}" data-emoji="${e}" aria-label="${e}">${e}</button>`).join('');
+}
+async function loadCode() {
+  const c = await getWeekCode();
+  if (!c) return;
+  $('#codeNow').textContent = c.text;
+  $('#codeMeta').textContent = 'Set ' + fmtTime(c.updatedAt);
+  try { passCount = (await fnCall({ kind: 'count' })).passes; } catch { passCount = 0; }
+  $('#cnote').textContent = passCount
+    ? `Updates ${passCount} wallet pass${passCount === 1 ? '' : 'es'} on members' phones automatically — uses ${passCount} of your 1,000 free pass updates this month.`
+    : 'No one has added a wallet pass yet. The website card updates right away.';
+}
 boot('admin').then(({ profile }) => {
   myId = profile.id;
   $('#aq').oninput = drawApproved; $('#mq').oninput = drawMembers;
+  drawEmoji(); loadCode();
+  $('#cemoji').onclick = (e) => { const x = e.target.closest('[data-emoji]'); if (x) { pickedEmoji = x.dataset.emoji; drawEmoji(); } };
+  $('#crand').onclick = () => {
+    const cur = $('#codeNow').textContent;
+    let w; do { w = CODE_WORDS[Math.floor(Math.random() * CODE_WORDS.length)]; } while (cur.endsWith(w) && CODE_WORDS.length > 1);
+    $('#cword').value = w;
+    pickedEmoji = CODE_EMOJI[Math.floor(Math.random() * CODE_EMOJI.length)]; drawEmoji();
+  };
+  $('#cf').onsubmit = async (e) => {
+    e.preventDefault();
+    const word = $('#cword').value.trim();
+    if (word.length < 2) return showMsg($('#cmsg'), 'Type a code word (2–14 characters) or tap Random.');
+    $('#csave').disabled = true; $('#csave').textContent = 'Saving…';
+    try {
+      const { error } = await sb.rpc('set_week_code', { p_word: word, p_emoji: pickedEmoji });
+      if (error) throw new Error(error.message);
+      let msg = 'Code saved. The live website card shows it now.';
+      if (passCount) {
+        $('#csave').textContent = `Updating ${passCount} pass${passCount === 1 ? '' : 'es'}…`;
+        const r = await fnCall({ kind: 'refresh' });
+        msg = `Code saved and ${r.updated} wallet pass${r.updated === 1 ? '' : 'es'} updated` + (r.phones ? ` (${r.phones} phone${r.phones === 1 ? '' : 's'} notified)` : '') + '.';
+        if (r.quotaHit) msg += ' Some passes weren\'t updated because the free monthly limit was reached.';
+        else if (r.failed) msg += ` ${r.failed} couldn't be updated — try saving again in a minute.`;
+      }
+      showMsg($('#cmsg'), msg, true);
+      $('#cword').value = '';
+      loadCode();
+    } catch (err) { showMsg($('#cmsg'), err.message); }
+    $('#csave').disabled = false; $('#csave').textContent = 'Save & update all passes';
+  };
   $('#af').onsubmit = async (e) => {
     e.preventDefault();
     const emails = [...new Set($('#emails').value.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))];
@@ -89,6 +152,7 @@ boot('admin').then(({ profile }) => {
       res = await sb.from('approved_emails').delete().eq('email', b.dataset.unapprove);
     } else if (b.dataset.del) {
       if (!confirm(`Remove ${b.dataset.name}'s account? Their card will stop scanning as valid.`)) return;
+      await fnCall({ kind: 'revoke', userId: b.dataset.del }).catch(() => {}); // void their wallet pass
       await sb.storage.from('photos').remove([`${b.dataset.del}/photo.jpg`, `${b.dataset.del}/thumb.png`, `${b.dataset.del}/wallet.json`, `${b.dataset.del}/pass.pkpass`]);
       res = await sb.rpc('delete_member', { p_id: b.dataset.del });
     } else if (b.dataset.admin) {

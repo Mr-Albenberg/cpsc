@@ -78,6 +78,19 @@
     return error ? null : data.signedUrl;
   };
 
+  // Call the wallet function as the logged-in user
+  window.fnCall = async function (body) {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Something went wrong.');
+    return d;
+  };
+  window.getWeekCode = async function () {
+    const { data } = await sb.from('club_settings').select('week_word,week_emoji,updated_at').eq('id', 1).maybeSingle();
+    return data ? { word: data.week_word, emoji: data.week_emoji, text: `${data.week_emoji} ${data.week_word}`.trim(), updatedAt: data.updated_at } : null;
+  };
+
   window.$ = (s) => document.querySelector(s);
   window.esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   window.showMsg = (el, text, ok) => { el.textContent = text; el.className = 'msg show ' + (ok ? 'ok' : 'err'); };

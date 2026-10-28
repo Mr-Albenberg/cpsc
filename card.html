@@ -12,6 +12,12 @@
       <div class="top"><span>CPSC</span><small>MEMBERSHIP CARD</small></div>
       <div class="who"><img id="photo" alt=""><div><div class="label">MEMBER</div><div class="name" id="name"></div></div></div>
       <div class="qr"><div id="qr"></div></div>
+      <div class="live-strip" id="live">
+        <div class="live-row"><span class="live-dot"></span><span>LIVE</span><span class="live-clock" id="liveClock">--:--:--</span></div>
+        <div class="live-label">THIS WEEK</div>
+        <div class="live-code" id="liveCode">…</div>
+        <div class="live-date" id="liveDate"></div>
+      </div>
       <div class="foot">Live to ski · Love to party</div>
     </div>
     <div class="wallet-buttons">
@@ -150,9 +156,22 @@ boot('member').then(async (ctx) => {
 
   $('#newphoto').onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { await uploadPhotoFiles(p.id, await makePhotoFiles(f)); await sb.storage.from('photos').remove([`${p.id}/wallet.json`]); await loadPhoto(); showMsg($('#msg'), 'Photo saved.', true); }
-    catch (err) { showMsg($('#msg'), err.message); }
+    try {
+      await uploadPhotoFiles(p.id, await makePhotoFiles(f)); await loadPhoto(); showMsg($('#msg'), 'Photo saved.', true);
+      fnCall({ kind: 'sync' }).catch(() => {}); // refresh their wallet pass in place
+    } catch (err) { showMsg($('#msg'), err.message); }
   };
+
+  // Live security strip: ticking clock + current check-in code. A screenshot can't keep up.
+  const tick = () => {
+    const d = new Date();
+    $('#liveClock').textContent = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    $('#liveDate').textContent = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+  tick(); setInterval(tick, 1000);
+  const loadCode = async () => { const c = await getWeekCode(); if (c) $('#liveCode').textContent = c.text; };
+  loadCode(); setInterval(loadCode, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) loadCode(); });
 }).catch(() => {});
 </script>
 </body></html>

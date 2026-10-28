@@ -173,3 +173,55 @@ footer { text-align: center; color: var(--muted); font-size: .75rem; padding: 20
 .steps li { display: flex; gap: 12px; align-items: flex-start; font-size: .95rem; line-height: 1.4; }
 .steps li span { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 700; font-size: .8rem; display: grid; place-items: center; }
 @keyframes up { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ===== Live security strip (on the website card) ===== */
+.live-strip {
+  position: relative; overflow: hidden; margin-top: 16px; border-radius: 14px; padding: 12px 14px 14px; text-align: center;
+  background: linear-gradient(110deg, #1b4f8a, #2a8fd0, #7fd0ff, #b38cff, #2a8fd0, #1b4f8a);
+  background-size: 300% 100%; animation: holo 6s linear infinite;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25);
+}
+.live-strip::before { /* moving light sweep */
+  content: ""; position: absolute; top: 0; bottom: 0; width: 45%; left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .55), transparent);
+  animation: sweep 2.4s ease-in-out infinite;
+}
+.live-strip::after { /* drifting diagonal micro-pattern */
+  content: ""; position: absolute; inset: 0; opacity: .18; pointer-events: none;
+  background: repeating-linear-gradient(45deg, #fff 0 2px, transparent 2px 9px);
+  animation: drift 3s linear infinite;
+}
+.live-strip > * { position: relative; z-index: 1; }
+.live-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-family: Montserrat, sans-serif; font-weight: 800; font-size: .68rem; letter-spacing: .18em; color: #fff; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #3dff9a; box-shadow: 0 0 0 0 rgba(61, 255, 154, .7); animation: pulse 1.4s ease-out infinite; }
+.live-clock { font-variant-numeric: tabular-nums; letter-spacing: .06em; font-size: .78rem; }
+.live-label { margin-top: 8px; font-size: .6rem; letter-spacing: .25em; color: rgba(255, 255, 255, .85); font-weight: 700; }
+.live-code { font-family: Montserrat, sans-serif; font-weight: 900; font-size: 1.45rem; color: #fff; text-shadow: 0 2px 10px rgba(11, 29, 51, .45); letter-spacing: .04em; }
+.live-date { font-size: .72rem; color: rgba(255, 255, 255, .9); margin-top: 2px; }
+@keyframes holo { to { background-position: 300% 0; } }
+@keyframes sweep { 0% { left: -60%; } 100% { left: 120%; } }
+@keyframes drift { to { background-position: 26px 0; } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(61, 255, 154, .7); } 100% { box-shadow: 0 0 0 10px rgba(61, 255, 154, 0); } }
+
+/* ===== Admin: check-in code ===== */
+.code-panel { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: start; margin-bottom: 20px; }
+.code-eyebrow { font-family: Montserrat, sans-serif; font-weight: 800; font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.code-big { font-family: Montserrat, sans-serif; font-weight: 900; font-size: clamp(1.8rem, 6vw, 2.6rem); margin: 6px 0 2px; color: var(--navy); }
+.code-form label:first-child { margin-top: 0; }
+.code-input { display: flex; gap: 8px; align-items: center; }
+.code-input input { text-transform: uppercase; font-weight: 700; letter-spacing: .05em; }
+.code-input .btn { flex: none; }
+.emoji-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.emoji-btn { width: 42px; height: 42px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; font-size: 1.25rem; cursor: pointer; }
+.emoji-btn.on { border-color: var(--ice); background: #e3f3fc; box-shadow: 0 0 0 3px rgba(79, 179, 232, .2); }
+
+/* ===== Scanner: code reminders ===== */
+.code-chip { background: var(--navy); color: #fff; border-radius: 999px; padding: 10px 16px; text-align: center; margin-bottom: 14px; font-size: .95rem; }
+.code-chip b { color: var(--ice-light); font-family: Montserrat, sans-serif; letter-spacing: .03em; }
+.code-check { background: var(--snow); border-radius: 12px; padding: 10px 12px; margin: 4px 0 14px; font-size: .92rem; }
+.code-check:empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-strip { animation-duration: 12s; }
+  .live-strip::before { animation-duration: 4s; }
+}

@@ -6,6 +6,7 @@
 <section class="hero"><div class="eyebrow">Check-in</div><h1>Scan a Card</h1><p>Point the camera at a member's wallet QR code.</p></section>
 <main>
 <div class="scanner">
+  <div class="code-chip" id="scanCode">Check-in code: …</div>
   <div class="panel" style="padding:14px">
     <div id="reader"></div>
     <div class="center" style="margin-top:12px"><button class="btn" id="start" type="button">Start camera</button></div>
@@ -16,6 +17,7 @@
     <div class="name" id="rname"></div>
     <div class="last" id="rlast"></div>
     <p class="muted" id="rmeta"></p>
+    <div class="code-check" id="rcode"></div>
     <button class="btn dark" id="next" type="button">Scan next</button>
   </div>
 </div>
@@ -28,6 +30,9 @@
 <script>
 boot('admin').then(() => {
   const scanner = new Html5Qrcode('reader');
+  let weekCode = null;
+  const loadCode = async () => { weekCode = await getWeekCode(); if (weekCode) $('#scanCode').innerHTML = 'Real cards show <b>' + esc(weekCode.text) + '</b>'; };
+  loadCode(); setInterval(loadCode, 60000);
   let busy = false, timer;
   const beep = (ok) => {
     try { const c = new AudioContext(), o = c.createOscillator(); o.frequency.value = ok ? 880 : 220; o.connect(c.destination); o.start(); o.stop(c.currentTime + 0.15); } catch {}
@@ -38,7 +43,7 @@ boot('admin').then(() => {
     $('#status').textContent = '✕ Not valid';
     $('#rphoto').style.display = 'none';
     $('#rname').textContent = 'Not recognized';
-    $('#rlast').textContent = text; $('#rmeta').textContent = '';
+    $('#rlast').textContent = text; $('#rmeta').textContent = ''; $('#rcode').innerHTML = '';
     beep(false);
   }
   async function onScan(code) {
@@ -53,6 +58,7 @@ boot('admin').then(() => {
       $('#rname').textContent = r.member.name;
       $('#rlast').innerHTML = 'Last scanned<strong>' + esc(r.lastScan ? fmtTime(r.lastScan) : 'First scan — welcome!') + '</strong>';
       $('#rmeta').textContent = (r.lastScannedBy ? 'by ' + r.lastScannedBy + ' · ' : '') + r.totalScans + ' total check-in' + (r.totalScans === 1 ? '' : 's');
+      $('#rcode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> and match this photo.' : '';
       const url = await signedPhoto(r.member.id);
       $('#rphoto').style.display = url ? '' : 'none';
       if (url) $('#rphoto').src = url;

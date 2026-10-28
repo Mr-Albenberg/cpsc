@@ -78,6 +78,16 @@ Copy a file as base64 on Windows (PowerShell): `[Convert]::ToBase64String([IO.Fi
 
 **Never commit certificate or key files to this repo** — it's public.
 
+## Check-in code (spotting copied cards)
+Admins set a code word + emoji on `admin.html` (e.g. 🎿 BLUEBIRD). It appears:
+- on every member's **wallet pass** (top right, "THIS WEEK") — passes update themselves on members' phones, nobody re-adds anything;
+- on the **live strip** of the website card, next to a clock ticking in seconds and a moving holographic shimmer (a screenshot freezes);
+- on the **scanner**, so door staff know what to look for.
+
+A card showing an old code, no code, or a frozen clock is a copy. Each code change uses one WalletWallet update per member who has a pass (free plan: 1,000/month), so weekly changes fit up to ~250 pass holders. Removing a member also voids their wallet pass.
+
+Database: run [`supabase/migrations/002_weekly_code.sql`](supabase/migrations/002_weekly_code.sql) once in the SQL Editor (already done for the live project).
+
 ## Branding
 - Replace `img/logo.png` with the club logo (square PNG, ~512px). It's used in the header and on both wallet passes.
 - Colors are the four variables at the top of `assets/style.css`. Pass colors can be set with the `PASS_BG`, `PASS_FG`, `PASS_LABEL` function secrets.
