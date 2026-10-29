@@ -88,6 +88,12 @@ A card showing an old code, no code, or a frozen clock is a copy. Each code chan
 
 Database: run [`supabase/migrations/002_weekly_code.sql`](supabase/migrations/002_weekly_code.sql) once in the SQL Editor (already done for the live project).
 
+**One working pass per member.** Every pass issued is recorded. Whenever a member adds their card to Apple or Google Wallet, any older CPSC pass they were issued is voided: iPhone greys it out and moves it to Expired Passes, and Google Wallet revokes it. Removing a member voids all of theirs.
+
+**Testing live updates.** On `admin.html`, *Test on your phone* sends a test word (e.g. 🧪 TEST 5:04 PM) to your own pass only — watch it change in Wallet without re-adding — then *Put the real code back*. Each press uses one WalletWallet update.
+
+Database: also run [`supabase/migrations/003_wallet_pass_history.sql`](supabase/migrations/003_wallet_pass_history.sql) (already done for the live project).
+
 ## Branding
 - Replace `img/logo.png` with the club logo (square PNG, ~512px). It's used in the header and on both wallet passes.
 - Colors are the four variables at the top of `assets/style.css`. Pass colors can be set with the `PASS_BG`, `PASS_FG`, `PASS_LABEL` function secrets.
