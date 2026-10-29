@@ -11,6 +11,15 @@
       <div class="code-big" id="codeNow">…</div>
       <div class="muted" id="codeMeta"></div>
       <p class="muted" style="margin-top:12px">Real cards show this on the wallet pass and on the live website card. A card with an old code, or no code, is a copy.</p>
+      <div class="test-box">
+        <div class="code-eyebrow">Test on your phone</div>
+        <p class="muted">Changes the word on <b>your own</b> wallet pass only, so you can watch it update without re-adding. Then put the real code back.</p>
+        <div class="test-actions">
+          <button type="button" class="btn dark small" id="tsend">Send test word to my pass</button>
+          <button type="button" class="btn ghost small" id="trestore">Put the real code back</button>
+        </div>
+        <div class="msg" id="tmsg"></div>
+      </div>
     </div>
     <form class="code-form" id="cf">
       <label for="cword">New code word</label>
@@ -107,6 +116,23 @@ boot('admin').then(({ profile }) => {
     let w; do { w = CODE_WORDS[Math.floor(Math.random() * CODE_WORDS.length)]; } while (cur.endsWith(w) && CODE_WORDS.length > 1);
     $('#cword').value = w;
     pickedEmoji = CODE_EMOJI[Math.floor(Math.random() * CODE_EMOJI.length)]; drawEmoji();
+  };
+  const busyBtn = (id, on, label) => { const el = $(id); el.disabled = on; if (label) el.textContent = label; };
+  $('#tsend').onclick = async () => {
+    busyBtn('#tsend', true, 'Sending…');
+    try {
+      const r = await fnCall({ kind: 'test', action: 'send' });
+      showMsg($('#tmsg'), r.phones
+        ? `Sent "${r.code}" to your pass and notified ${r.phones} phone${r.phones === 1 ? '' : 's'}. Open Wallet — it should change within a minute, no re-adding. Google Wallet updates on its own too.`
+        : `Sent "${r.code}", but no iPhone is signed up for updates on your pass yet. In Wallet, open the pass → ⋯ → Pass Details and make sure Automatic Updates is on. If it still doesn't change, tap Add to Apple Wallet on your card page once — after that, updates arrive on their own.`, !!r.phones);
+    } catch (err) { showMsg($('#tmsg'), err.message); }
+    busyBtn('#tsend', false, 'Send test word to my pass');
+  };
+  $('#trestore').onclick = async () => {
+    busyBtn('#trestore', true, 'Putting back…');
+    try { const r = await fnCall({ kind: 'test', action: 'restore' }); showMsg($('#tmsg'), `Put "${r.code}" back on your pass.`, true); }
+    catch (err) { showMsg($('#tmsg'), err.message); }
+    busyBtn('#trestore', false, 'Put the real code back');
   };
   $('#cf').onsubmit = async (e) => {
     e.preventDefault();

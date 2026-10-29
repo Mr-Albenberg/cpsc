@@ -131,6 +131,34 @@ export async function wwUpdate(serial: string, body: unknown): Promise<number | 
   return Number(d.notifiedDevices) || 0;
 }
 
+// ---- pass history: one working pass per member ----
+async function track(userId: string, serial: string) {
+  await db.from('wallet_passes').upsert({ serial, user_id: userId }, { onConflict: 'serial', ignoreDuplicates: true });
+}
+// Void every pass this member was ever issued except `keep` (null = void them all).
+// WalletWallet pushes the voided version to each phone (iPhone greys it out and moves it to
+// Expired Passes) and revokes the Google Wallet copy.
+export async function retireOthers(userId: string, keep: string | null) {
+  let q = db.from('wallet_passes').select('serial').eq('user_id', userId).is('revoked_at', null);
+  if (keep) q = q.neq('serial', keep);
+  const { data } = await q;
+  let n = 0;
+  for (const { serial } of data || []) {
+    const r = await fetch(`${WW}/api/passes/${serial}`, { method: 'DELETE', headers: wwHeaders() }).catch(() => null);
+    if (r && (r.ok || r.status === 404)) {
+      await db.from('wallet_passes').update({ revoked_at: new Date().toISOString() }).eq('serial', serial);
+      n++;
+    }
+  }
+  return n;
+}
+// Re-download the member's latest .pkpass so anyone who (re)adds it gets the current version.
+async function refreshPkpass(id: string, c: Partial<WWCache>) {
+  if (!c.serial || !c.token || !c.passType) return;
+  const r = await fetch(`${WW}/v1/passes/${c.passType}/${c.serial}`, { headers: { Authorization: `ApplePass ${c.token}` } });
+  if (r.ok) await savePkpass(id, new Uint8Array(await r.arrayBuffer()));
+}
+
 // Make sure this member has an up-to-date pass. Creates it on first use, updates it if stale.
 export async function wwPassFor(p: Profile): Promise<WWCache> {
   const code = (await currentCode()).text;
@@ -138,7 +166,10 @@ export async function wwPassFor(p: Profile): Promise<WWCache> {
   const cache = await readCache(p.id);
   const serial = p.wallet_serial || cache?.serial;
 
-  if (serial && cache?.v === 3 && cache.serial === serial && cache.sig === sig) return cache as WWCache;
+  if (serial && cache?.v === 3 && cache.serial === serial && cache.sig === sig) {
+    await track(p.id, serial);
+    return cache as WWCache;
+  }
 
   // Existing pass → update in place so it stays the same pass on the member's phone.
   if (serial && cache?.googleSaveUrl) {
@@ -156,6 +187,7 @@ export async function wwPassFor(p: Profile): Promise<WWCache> {
         const c: WWCache = { v: 3, serial, googleSaveUrl: cache.googleSaveUrl, token: meta.token, passType: meta.passType, sig };
         await writeCache(p.id, c);
         if (!p.wallet_serial) await db.from('profiles').update({ wallet_serial: serial }).eq('id', p.id);
+        await track(p.id, serial);
         return c;
       }
     }
@@ -165,15 +197,15 @@ export async function wwPassFor(p: Profile): Promise<WWCache> {
   const r = await fetch(`${WW}/api/passes`, { method: 'POST', headers: wwHeaders(), body: JSON.stringify(wwBody(p, code, await thumbFor(p.id))) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.serialNumber) wwError(r.status, d);
-  if (serial && serial !== d.serialNumber) {
-    await fetch(`${WW}/api/passes/${serial}`, { method: 'DELETE', headers: wwHeaders() }).catch(() => {});
-  }
+  if (serial) await track(p.id, serial);
+  await track(p.id, d.serialNumber);
   const buf = new Uint8Array(Buffer.from(d.applePass, 'base64'));
   const meta = passMeta(buf);
   await savePkpass(p.id, buf);
   const c: WWCache = { v: 3, serial: d.serialNumber, googleSaveUrl: d.googleSaveUrl, token: meta.token, passType: meta.passType, sig };
   await writeCache(p.id, c);
   await db.from('profiles').update({ wallet_serial: d.serialNumber }).eq('id', p.id);
+  await retireOthers(p.id, d.serialNumber);
   return c;
 }
 
@@ -195,10 +227,7 @@ export async function wwRefreshAll() {
         const cache = await readCache(p.id);
         if (cache?.serial === p.wallet_serial && cache.googleSaveUrl) {
           await writeCache(p.id, { ...(cache as WWCache), v: 3, sig: `${p.name}|${code}` });
-          if (cache.token && cache.passType) {
-            const r = await fetch(`${WW}/v1/passes/${cache.passType}/${p.wallet_serial}`, { headers: { Authorization: `ApplePass ${cache.token}` } });
-            if (r.ok) await savePkpass(p.id, new Uint8Array(await r.arrayBuffer()));
-          }
+          await refreshPkpass(p.id, cache);
         }
       } catch (e) {
         failed++;
@@ -351,7 +380,8 @@ export async function handler(req: Request): Promise<Response> {
         const thumb = thumbBlob ? Buffer.from(await thumbBlob.arrayBuffer()) : null;
         buf = await buildApplePass(p, thumb, await logo());
       } else {
-        await wwPassFor(p);
+        const cur = await wwPassFor(p);
+        await retireOthers(p.id, cur.serial); // one working CPSC pass per member
         const { data: file } = await db.storage.from('photos').download(`${p.id}/pass.pkpass`);
         if (!file) throw new Error('pass file missing');
         buf = Buffer.from(await file.arrayBuffer());
@@ -388,14 +418,34 @@ export async function handler(req: Request): Promise<Response> {
         const { count } = await db.from('profiles').select('id', { count: 'exact', head: true }).not('wallet_serial', 'is', null);
         return json({ passes: count || 0 });
       }
+      // Admin: send a test word to YOUR OWN pass (or put the real code back) to check live updates
+      if (kind === 'test') {
+        if (!(await isAdmin())) return json({ error: 'Admins only.' }, 403);
+        if (!wwReady()) return json({ error: 'Wallet passes are not set up.' }, 503);
+        const cache = await readCache(p.id);
+        const serial = p.wallet_serial || cache?.serial;
+        if (!serial || !cache?.googleSaveUrl) return json({ error: 'Add your card to Apple or Google Wallet first, then run the test.' }, 400);
+        if (body.action === 'restore') {
+          const c = await wwPassFor(p); // cache is marked stale by the test, so this pushes the real code
+          return json({ code: (await currentCode()).text, serial: c.serial });
+        }
+        const t = new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
+        const testCode = `🧪 TEST ${t}`;
+        const phones = await wwUpdate(serial, wwBody(p, testCode, await thumbFor(p.id)));
+        if (phones === null) return json({ error: 'That pass no longer exists. Tap Add to Wallet on your card page to get a fresh one.' }, 410);
+        await track(p.id, serial);
+        await writeCache(p.id, { ...(cache as WWCache), serial, sig: `${p.name}|${testCode}` }); // next add/restore re-syncs
+        await refreshPkpass(p.id, { ...cache, serial });
+        return json({ code: testCode, phones });
+      }
       // Admin: void a member's pass before removing their account
       if (kind === 'revoke') {
         if (!(await isAdmin())) return json({ error: 'Admins only.' }, 403);
         const target = await profileFor(String(body.userId || ''));
-        const c = target ? await readCache(target.id) : null;
-        const serial = target?.wallet_serial || c?.serial;
-        if (serial && wwReady()) await wwRevoke(serial);
-        return json({ ok: true });
+        if (!target || !wwReady()) return json({ ok: true, voided: 0 });
+        const c = await readCache(target.id);
+        for (const sr of [target.wallet_serial, c?.serial]) if (sr) await track(target.id, sr);
+        return json({ ok: true, voided: await retireOthers(target.id, null) });
       }
 
       if (kind === 'apple') {
@@ -405,7 +455,11 @@ export async function handler(req: Request): Promise<Response> {
       }
       if (kind === 'google') {
         if (!googleReady() && !wwReady()) return json({ error: 'Google Wallet is not set up yet.' }, 503);
-        if (!googleReady()) return json({ url: (await wwPassFor(p)).googleSaveUrl });
+        if (!googleReady()) {
+          const cur = await wwPassFor(p);
+          await retireOthers(p.id, cur.serial); // one working CPSC pass per member
+          return json({ url: cur.googleSaveUrl });
+        }
         // Google's servers fetch the photo from this long-lived private link to show it on the pass
         const { data: signed } = await db.storage.from('photos').createSignedUrl(`${p.id}/photo.jpg`, 60 * 60 * 24 * 365 * 5);
         return json({ url: await googleSaveUrl(p, signed?.signedUrl ?? null) });
