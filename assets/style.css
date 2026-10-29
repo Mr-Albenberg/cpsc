@@ -59,7 +59,7 @@ a { color: var(--black); }
 .site-header.open .menu-btn span:nth-child(1) { transform: translateY(4px) rotate(45deg); }
 .site-header.open .menu-btn span:nth-child(2) { opacity: 0; }
 .site-header.open .menu-btn span:nth-child(3) { transform: translateY(-4px) rotate(-45deg); }
-@media (max-width: 1020px) {
+@media (max-width: 1140px) {
   .site-header .inner { flex-wrap: wrap; }
   .menu-btn { display: flex; }
   .nav { display: none; width: 100%; margin: 0; flex-direction: column; align-items: stretch; gap: 10px; padding: 6px 0 4px; }
@@ -467,3 +467,26 @@ main.club img { height: auto; }
 .home-intro h1 { font-size: clamp(2.8rem, 9vw, 5.4rem); line-height: .9; margin: 0; }
 .home-intro p { font-size: 1.12rem; line-height: 1.55; max-width: 620px; margin: 12px auto 0; }
 .home-intro .btn-row { justify-content: center; }
+
+/* Exec board (members only) */
+.exec-top { padding-bottom: 44px; }
+.exec-top .chips .chip { color: #fff; text-decoration: none; }
+.exec-top .chips .chip:hover { background: var(--lime); color: #000; }
+.exec { display: grid; grid-template-columns: 1.15fr 1fr; gap: 40px; align-items: center; padding: 44px 0; border-bottom: 2px solid #000; scroll-margin-top: 20px; }
+.exec:last-child { border-bottom: 0; }
+.exec.flip .exec-photos { order: 2; }
+.exec-photos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.exec-photos button { all: unset; cursor: zoom-in; border-radius: 12px; overflow: hidden; aspect-ratio: 9 / 16; box-shadow: var(--shadow); background: #ddd; }
+.exec-photos button:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
+.exec-photos img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+.exec-photos button:hover img { transform: scale(1.05); }
+.exec-photos .ph { aspect-ratio: 9 / 16; border-radius: 12px; background: var(--lime); display: grid; place-items: center; font: 400 3rem/1 "Bebas Neue", sans-serif; }
+.exec-text h2 { font-size: clamp(2.4rem, 6vw, 3.6rem); margin: 0 0 12px; line-height: .95; }
+.exec-text h2 span { display: block; font-size: .5em; color: var(--muted); letter-spacing: .06em; margin-top: 4px; }
+.exec-text p { line-height: 1.7; margin: 0; max-width: 60ch; }
+@media (max-width: 820px) {
+  .exec { grid-template-columns: 1fr; gap: 20px; padding: 32px 0; }
+  .exec.flip .exec-photos { order: 0; }
+  .exec-photos { grid-template-columns: repeat(4, 72%); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
+  .exec-photos > * { scroll-snap-align: start; }
+}

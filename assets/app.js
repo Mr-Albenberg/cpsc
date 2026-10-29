@@ -11,7 +11,7 @@
 
   // Club pages (content from cpsconline.com) + account links for who's logged in
   const CLUB = [['home.html', 'Home'], ['about.html', 'About'], ['events.html', 'Events'], ['big-trip.html', 'Big Trip'],
-    ['ikon.html', 'Ikon Pass'], ['sponsors.html', 'Sponsors'], ['join.html', 'Join']];
+    ['ikon.html', 'Ikon Pass'], ['sponsors.html', 'Sponsors'], ['exec-board.html', 'Exec Board'], ['join.html', 'Join']];
   function renderHeader(nav) {
     const acct = {
       guest: [['index.html', 'Log in']],
@@ -41,6 +41,12 @@
       Supabase project URL and anon key (Supabase → Project Settings → API). See the README for the full setup.</p></div>`;
   }
 
+  // Where to go after logging in (?next=exec-board.html), only pages on this site
+  window.nextPage = function () {
+    const n = new URLSearchParams(location.search).get('next') || '';
+    return /^[a-z0-9-]+\.html$/.test(n) && n !== 'index.html' ? n : 'card.html';
+  };
+
   // need: 'guest' | 'member' | 'admin' | 'any' | 'public'
   window.boot = async function (need) {
     renderHeader('guest');
@@ -53,10 +59,10 @@
       return { session };
     }
     if (need === 'guest') {
-      if (session) { location.replace('card.html'); throw new Error('redirect'); }
+      if (session) { location.replace(window.nextPage()); throw new Error('redirect'); }
       return {};
     }
-    if (!session) { location.replace('index.html'); throw new Error('redirect'); }
+    if (!session) { location.replace('index.html?next=' + encodeURIComponent(here)); throw new Error('redirect'); }
     const { data: profile, error } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
     if (error || !profile) {
       await sb.auth.signOut();

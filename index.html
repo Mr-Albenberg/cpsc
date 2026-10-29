@@ -23,6 +23,7 @@
     <a href="big-trip.html">Big Trip 2027</a>
     <a href="ikon.html">Ikon Pass</a>
     <a href="sponsors.html">Sponsors</a>
+    <a href="exec-board.html">Exec Board</a>
     <a href="join.html">Join</a>
     <a href="card.html">My Card</a>
   </nav>
@@ -33,6 +34,7 @@
 <script src="assets/app.js"></script>
 <script>
 boot('guest').then(() => {
+  if (new URLSearchParams(location.search).get('next') === 'exec-board.html') showMsg($('#msg'), 'The Exec Board page is for members — log in to see it.', 'ok');
   if (new URLSearchParams(location.search).has('gone')) showMsg($('#msg'), 'That account has been removed. Ask an exec board member if this is a mistake.');
   $('#f').onsubmit = async (e) => {
     e.preventDefault(); $('#go').disabled = true;
@@ -43,7 +45,7 @@ boot('guest').then(() => {
       $('#go').disabled = false;
       return showMsg($('#msg'), /confirm/i.test(error.message) ? 'Confirm your email first — check your inbox for the link.' : 'Wrong email/username or password.');
     }
-    location.href = 'card.html';
+    location.href = nextPage();
   };
   $('#forgot').onclick = async () => {
     const email = $('#email').value.trim();
