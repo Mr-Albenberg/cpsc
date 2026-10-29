@@ -80,7 +80,7 @@ Copy a file as base64 on Windows (PowerShell): `[Convert]::ToBase64String([IO.Fi
 
 ## Check-in code (spotting copied cards)
 Admins set a code word on `admin.html` (e.g. Bluebird). It appears:
-- on every member's **wallet pass**, quietly, in the small line under the QR code (e.g. "#0002 · Bluebird") — passes update themselves on members' phones, nobody re-adds anything;
+- on every member's **wallet pass**, in the top-right corner with no label — passes update themselves on members' phones, nobody re-adds anything;
 - on the **live strip** of the website card, next to a clock ticking in seconds and a moving holographic shimmer (a screenshot freezes);
 - on the **scanner**, so door staff know what to look for.
 
@@ -93,6 +93,9 @@ Database: run [`supabase/migrations/002_weekly_code.sql`](supabase/migrations/00
 **Testing live updates.** On `admin.html`, *Test on your phone* sends a test word (e.g. Test 5:04 PM) to your own pass only — watch it change in Wallet without re-adding — then *Put the real code back*. Each press uses one WalletWallet update.
 
 Database: also run [`supabase/migrations/003_wallet_pass_history.sql`](supabase/migrations/003_wallet_pass_history.sql) and [`004_member_numbers.sql`](supabase/migrations/004_member_numbers.sql) (already done for the live project).
+
+## Club branding
+The look comes from cpsconline.com: lime header (`#ecffb0`), the black CPSC mountain logo, Bebas Neue headings and buttons, Questrial text, black buttons, and the homepage group photo on the login and sign-up pages. Logo files live in `img/` (`logo.png` black, `logo-white.png` for dark backgrounds, `icon.png` square). Wallet passes use the dark preset on WalletWallet's free plan; on a paid plan they automatically switch to the club color and the real logo.
 
 ## Branding
 - Replace `img/logo.png` with the club logo (square PNG, ~512px). It's used in the header and on both wallet passes.

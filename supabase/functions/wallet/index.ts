@@ -20,9 +20,9 @@ const SERVICE_KEY = env('SUPABASE_SERVICE_ROLE_KEY') || (() => {
 const SITE_URL = env('SITE_URL').replace(/\/$/, ''); // e.g. https://mr-albenberg.github.io/cpsc
 const ORG = env('ORG_NAME') || 'Central Pacific Ski Club';
 const SHORT = env('ORG_SHORT') || 'CPSC';
-const BG = env('PASS_BG') || '#0b1d33';
+const BG = env('PASS_BG') || '#121212';
 const FG = env('PASS_FG') || '#ffffff';
-const LABEL = env('PASS_LABEL') || '#7fd0ff';
+const LABEL = env('PASS_LABEL') || '#ECFFB0';
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
@@ -70,28 +70,32 @@ const memberNo = (p: Profile) => (p.member_no ? '#' + String(p.member_no).padSta
 const CLUB = 'https://cpsconline.com';
 
 // Bump LAYOUT when the pass design changes so existing passes get the new look on their next update.
-const LAYOUT = 'L4';
+const LAYOUT = 'L5';
 export const sigOf = (p: Profile, code: string) => [LAYOUT, p.name, memberNo(p), p.is_admin ? 'exec' : 'member', code].join('|');
 
 export function wwBody(p: Profile, code: string, thumbUri?: string) {
   const no = memberNo(p);
+  const site = SITE_URL || 'https://mr-albenberg.github.io/cpsc';
   return {
     logoText: SHORT,
     organizationName: ORG,
     description: `${ORG} — ${p.name}'s membership card`,
-    colorPreset: env('WALLETWALLET_COLOR') || 'blue',
-    colorPro: BG,                 // paid plan only (ignored on free)
-    thumbnailURLPro: thumbUri,    // paid plan only (ignored on free)
-    headerFields: [{ label: 'SEASON', value: season() }],
-    primaryFields: [{ label: p.is_admin ? 'EXEC BOARD' : 'SKI CLUB MEMBER', value: p.name }],
+    // Free plan: closest preset to the club's black & white look. Paid plan: exact color + real logo.
+    colorPreset: env('WALLETWALLET_COLOR') || 'dark',
+    colorPro: BG,
+    logoURLPro: `${site}/img/logo-white.png`,
+    iconURLPro: `${site}/img/icon.png`,
+    thumbnailURLPro: thumbUri,
+    headerFields: [{ value: code }],                       // the check-in word, top right, no label
+    primaryFields: [{ label: 'LIVE TO SKI, LOVE TO PARTY', value: p.name }],
     secondaryFields: [
-      ...(no ? [{ label: 'MEMBER', value: no }] : []),
+      ...(no ? [{ label: p.is_admin ? 'EXEC BOARD' : 'MEMBER', value: no }] : []),
+      { label: 'SEASON', value: season() },
       { label: 'SINCE', value: String(new Date(p.created_at).getFullYear()) },
     ],
     barcodeValue: QR(p.serial),
     barcodeFormat: 'QR',
-    // The check-in code sits quietly in the small line under the QR code
-    barcodeAltText: [no, code].filter(Boolean).join(' · ').slice(0, 128),
+    barcodeAltText: ORG,
   };
 }
 
@@ -273,8 +277,8 @@ async function readToken(token: string) {
 let logoCache: Buffer | null = null;
 async function logo() {
   if (!logoCache) {
-    const r = await fetch(`${SITE_URL}/img/logo.png`);
-    if (!r.ok) throw new Error('Could not load img/logo.png from SITE_URL');
+    const r = await fetch(`${SITE_URL}/img/icon.png`);
+    if (!r.ok) throw new Error('Could not load img/icon.png from SITE_URL');
     logoCache = Buffer.from(await r.arrayBuffer());
   }
   return logoCache;

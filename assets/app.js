@@ -18,7 +18,7 @@
     let header = document.querySelector('.site-header');
     if (!header) { header = document.createElement('header'); header.className = 'site-header'; document.body.prepend(header); }
     header.innerHTML = `<div class="inner">
-      <a class="brand" href="${nav === 'guest' ? 'index.html' : 'card.html'}"><img src="img/logo.png" alt="" onerror="this.parentNode.classList.add('no-logo')"><span class="mark">CPSC</span><span>Central Pacific Ski Club</span></a>
+      <a class="brand" href="${nav === 'guest' ? 'index.html' : 'card.html'}"><img src="img/logo.png" alt="CPSC" onerror="this.parentNode.classList.add('no-logo')"><span class="mark">CPSC</span><span>Central Pacific Ski Club</span></a>
       <nav class="nav">${links.map(([h, t]) => `<a href="${h}" class="${here === h ? 'active' : ''}">${t}</a>`).join('')}
       ${nav !== 'guest' ? '<button id="logout" type="button">Log out</button>' : ''}</nav></div>`;
     const lo = document.getElementById('logout');

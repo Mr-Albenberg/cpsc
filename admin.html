@@ -1,7 +1,7 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1d33"><meta name="robots" content="noindex, nofollow">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/logo.png"><title>Members · CPSC Membership</title></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ecffb0"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Questrial&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>Members · CPSC Membership</title></head>
 <body>
 <section class="hero"><div class="eyebrow">Exec board</div><h1>Members</h1><p>Approve emails so people can sign up, and see who's been scanned in.</p></section>
 <main>
@@ -10,7 +10,7 @@
       <div class="code-eyebrow">This week's check-in code</div>
       <div class="code-big" id="codeNow">…</div>
       <div class="muted" id="codeMeta"></div>
-      <p class="muted" style="margin-top:12px">Real cards show this word under the QR code on the wallet pass, and on the live website card. A card with an old word, or none, is a copy.</p>
+      <p class="muted" style="margin-top:12px">Real cards show this word in the top-right corner of the wallet pass, and on the live website card. A card with an old word, or none, is a copy.</p>
       <div class="test-box">
         <div class="code-eyebrow">Test on your phone</div>
         <p class="muted">Changes the word on <b>your own</b> wallet pass only, so you can watch it update without re-adding. Then put the real code back.</p>
@@ -48,7 +48,19 @@
     <div class="table-wrap"><table><thead><tr><th>Member</th><th>Last scanned</th><th>Scans</th><th>Role</th><th></th></tr></thead><tbody id="members"></tbody></table></div>
   </div>
 </main>
-<footer>Central Pacific Ski Club · San Luis Obispo</footer>
+<footer class="site-footer">
+  <img src="img/logo-white.png" alt="CPSC">
+  <div class="tag">Live to ski, love to party</div>
+  <nav class="links" aria-label="Central Pacific Ski Club">
+    <a href="https://cpsconline.com/about/">About</a>
+    <a href="https://cpsconline.com/small-trip-info-page/">Events</a>
+    <a href="https://cpsconline.com/big-trip-2027/">Big Trip 2027</a>
+    <a href="https://cpsconline.com/sponsors/">Sponsors</a>
+    <a href="https://cpsconline.com/membership-discounts/">Member Discounts</a>
+    <a href="https://cpsconline.com/exec-board-26-27/">Exec Board</a>
+  </nav>
+  <div>Central Pacific Ski Club · San Luis Obispo · <a href="https://cpsconline.com" style="color:#fff">cpsconline.com</a></div>
+</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="assets/app.js"></script>

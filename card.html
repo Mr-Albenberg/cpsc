@@ -1,7 +1,7 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1d33"><meta name="robots" content="noindex, nofollow">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/logo.png"><title>My card · CPSC Membership</title></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ecffb0"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Questrial&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>My card · CPSC Membership</title></head>
 <body>
 <section class="hero"><div class="eyebrow">Your membership</div><h1 id="hi">Hey there</h1><p>Add your card to your wallet and show the QR code at events and trips.</p></section>
 <main>
@@ -9,7 +9,7 @@
   <div class="panel">
     <div class="notice" id="needPhoto" style="display:none"><strong>Add your photo to finish your card</strong>Admins see it when they scan you in. Use "Choose photo" on this page.</div>
     <div class="member-card">
-      <div class="top"><span>CPSC</span><small>MEMBERSHIP CARD</small></div>
+      <div class="top"><img class="card-logo" src="img/logo-white.png" alt="CPSC"><small>MEMBERSHIP CARD</small></div>
       <div class="who"><img id="photo" alt=""><div><div class="label" id="role">MEMBER</div><div class="name" id="name"></div><div class="memno" id="memno"></div></div></div>
       <div class="qr"><div id="qr"></div></div>
       <div class="live-strip" id="live">
@@ -42,11 +42,23 @@
     <label>Photo</label>
     <div class="photo-pick"><label for="newphoto" class="btn ghost small" style="margin:0">Choose photo</label><input type="file" id="newphoto" accept="image/*"></div>
     <div class="msg" id="msg"></div>
-    <p class="muted" style="margin-top:18px">Changed your photo? Re-add the card to your wallet so it shows the new one.</p>
+    <p class="muted" style="margin-top:18px">Your wallet pass updates on its own — no need to re-add it.</p>
   </div>
 </div>
 </main>
-<footer>Central Pacific Ski Club · San Luis Obispo</footer>
+<footer class="site-footer">
+  <img src="img/logo-white.png" alt="CPSC">
+  <div class="tag">Live to ski, love to party</div>
+  <nav class="links" aria-label="Central Pacific Ski Club">
+    <a href="https://cpsconline.com/about/">About</a>
+    <a href="https://cpsconline.com/small-trip-info-page/">Events</a>
+    <a href="https://cpsconline.com/big-trip-2027/">Big Trip 2027</a>
+    <a href="https://cpsconline.com/sponsors/">Sponsors</a>
+    <a href="https://cpsconline.com/membership-discounts/">Member Discounts</a>
+    <a href="https://cpsconline.com/exec-board-26-27/">Exec Board</a>
+  </nav>
+  <div>Central Pacific Ski Club · San Luis Obispo · <a href="https://cpsconline.com" style="color:#fff">cpsconline.com</a></div>
+</footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
@@ -93,20 +105,24 @@ function closeGuide() { $('#guide').hidden = true; document.body.style.overflow 
 // A clean image of the card: big QR on white so the phone's scanner reads it reliably.
 async function cardImageBlob() {
   const qr = $('#qr canvas');
-  const W = 900, H = 1180, c = document.createElement('canvas');
+  const W = 900, H = 1240, c = document.createElement('canvas');
   c.width = W; c.height = H;
   const x = c.getContext('2d');
-  x.fillStyle = '#0b1d33'; x.fillRect(0, 0, W, H);
-  x.fillStyle = '#7fd0ff'; x.font = '800 34px Montserrat, Arial, sans-serif'; x.textAlign = 'center';
-  x.fillText('CENTRAL PACIFIC SKI CLUB', W / 2, 90);
-  x.fillStyle = '#ffffff'; x.font = '900 64px Montserrat, Arial, sans-serif';
-  x.fillText(me.profile.name.toUpperCase().slice(0, 22), W / 2, 175);
-  x.fillStyle = '#ffffff'; x.beginPath(); x.roundRect(110, 240, 680, 680, 36); x.fill();
+  await document.fonts.load('80px "Bebas Neue"').catch(() => {});
+  const logo = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = 'img/logo-white.png'; });
+  x.fillStyle = '#121212'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#ecffb0'; x.fillRect(0, 0, W, 14);
+  if (logo) { const lw = 300, lh = lw * logo.height / logo.width; x.drawImage(logo, (W - lw) / 2, 50, lw, lh); }
+  x.textAlign = 'center';
+  x.fillStyle = '#ffffff'; x.font = '84px "Bebas Neue", Impact, sans-serif';
+  x.fillText(me.profile.name.toUpperCase().slice(0, 24), W / 2, 285);
+  x.fillStyle = '#ffffff'; x.beginPath(); x.roundRect(130, 330, 640, 640, 30); x.fill();
   x.imageSmoothingEnabled = false;
-  x.drawImage(qr, 150, 280, 600, 600);
-  x.fillStyle = '#9fb6cc'; x.font = '600 30px Inter, Arial, sans-serif';
-  x.fillText('MEMBERSHIP CARD · SHOW AT EVENTS', W / 2, 1010);
-  x.fillText('LIVE TO SKI · LOVE TO PARTY', W / 2, 1060);
+  x.drawImage(qr, 165, 365, 570, 570);
+  x.fillStyle = '#ecffb0'; x.font = '58px "Bebas Neue", Impact, sans-serif';
+  x.fillText('LIVE TO SKI, LOVE TO PARTY', W / 2, 1075);
+  x.fillStyle = '#9a9a9a'; x.font = '34px "Bebas Neue", Impact, sans-serif';
+  x.fillText('CENTRAL PACIFIC SKI CLUB · MEMBERSHIP CARD', W / 2, 1140);
   return new Promise((r) => c.toBlob(r, 'image/png'));
 }
 async function saveCardImage() {
