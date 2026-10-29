@@ -32,7 +32,7 @@
 boot('admin').then(() => {
   const scanner = new Html5Qrcode('reader');
   let weekCode = null;
-  const loadCode = async () => { weekCode = await getWeekCode(); if (weekCode) $('#scanCode').innerHTML = 'Real cards show <b>' + esc(weekCode.text) + '</b>'; };
+  const loadCode = async () => { weekCode = await getWeekCode(); if (weekCode) $('#scanCode').innerHTML = 'Real cards show <b>' + esc(weekCode.text) + '</b> under the QR code'; };
   loadCode(); setInterval(loadCode, 60000);
   let busy = false, timer;
   const beep = (ok) => {
@@ -60,7 +60,7 @@ boot('admin').then(() => {
       $('#rnum').textContent = [r.member.memberNo ? '#' + String(r.member.memberNo).padStart(4, '0') : '', r.member.isAdmin ? 'Exec board' : ''].filter(Boolean).join(' · ');
       $('#rlast').innerHTML = 'Last scanned<strong>' + esc(r.lastScan ? fmtTime(r.lastScan) : 'First scan — welcome!') + '</strong>';
       $('#rmeta').textContent = (r.lastScannedBy ? 'by ' + r.lastScannedBy + ' · ' : '') + r.totalScans + ' total check-in' + (r.totalScans === 1 ? '' : 's');
-      $('#rcode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> and match this photo.' : '';
+      $('#rcode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> under the QR code and match this photo.' : '';
       const url = await signedPhoto(r.member.id);
       $('#rphoto').style.display = url ? '' : 'none';
       if (url) $('#rphoto').src = url;

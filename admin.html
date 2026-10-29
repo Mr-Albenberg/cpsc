@@ -10,7 +10,7 @@
       <div class="code-eyebrow">This week's check-in code</div>
       <div class="code-big" id="codeNow">…</div>
       <div class="muted" id="codeMeta"></div>
-      <p class="muted" style="margin-top:12px">Real cards show this on the wallet pass and on the live website card. A card with an old code, or no code, is a copy.</p>
+      <p class="muted" style="margin-top:12px">Real cards show this word under the QR code on the wallet pass, and on the live website card. A card with an old word, or none, is a copy.</p>
       <div class="test-box">
         <div class="code-eyebrow">Test on your phone</div>
         <p class="muted">Changes the word on <b>your own</b> wallet pass only, so you can watch it update without re-adding. Then put the real code back.</p>
@@ -23,9 +23,7 @@
     </div>
     <form class="code-form" id="cf">
       <label for="cword">New code word</label>
-      <div class="code-input"><input type="text" id="cword" maxlength="14" autocomplete="off" placeholder="e.g. BLUEBIRD"><button type="button" class="btn ghost small" id="crand">🎲 Random</button></div>
-      <label>Emoji</label>
-      <div class="emoji-row" id="cemoji"></div>
+      <div class="code-input"><input type="text" id="cword" maxlength="14" autocomplete="off" placeholder="e.g. BLUEBIRD"><button type="button" class="btn ghost small" id="crand">Random</button></div>
       <button class="btn block" type="submit" id="csave">Save &amp; update all passes</button>
       <p class="muted center" id="cnote" style="margin:10px 0 0"></p>
       <div class="msg" id="cmsg"></div>
@@ -91,11 +89,7 @@ async function load() {
   }
 }
 const CODE_WORDS = ['POWDER', 'BLUEBIRD', 'GNARLY', 'CORDUROY', 'FIRST CHAIR', 'FRESH TRACKS', 'SEND IT', 'APRES', 'FACE SHOT', 'YARD SALE', 'HOT LAPS', 'GONDOLA', 'MOGUL', 'SKI BUM', 'PARK RAT', 'TREE RUN', 'COLD SMOKE', 'SNOWBALL', 'GROOMER', 'FROSTBITE'];
-const CODE_EMOJI = ['🏔️', '🎿', '🏂', '❄️', '⛷️', '🌲', '🔥', '☀️', '🌊', '🐻', '🦅', '⚡'];
-let pickedEmoji = CODE_EMOJI[0], passCount = 0;
-function drawEmoji() {
-  $('#cemoji').innerHTML = CODE_EMOJI.map((e) => `<button type="button" class="emoji-btn${e === pickedEmoji ? ' on' : ''}" data-emoji="${e}" aria-label="${e}">${e}</button>`).join('');
-}
+let passCount = 0;
 async function loadCode() {
   const c = await getWeekCode();
   if (!c) return;
@@ -109,13 +103,11 @@ async function loadCode() {
 boot('admin').then(({ profile }) => {
   myId = profile.id;
   $('#aq').oninput = drawApproved; $('#mq').oninput = drawMembers;
-  drawEmoji(); loadCode();
-  $('#cemoji').onclick = (e) => { const x = e.target.closest('[data-emoji]'); if (x) { pickedEmoji = x.dataset.emoji; drawEmoji(); } };
+  loadCode();
   $('#crand').onclick = () => {
     const cur = $('#codeNow').textContent;
-    let w; do { w = CODE_WORDS[Math.floor(Math.random() * CODE_WORDS.length)]; } while (cur.endsWith(w) && CODE_WORDS.length > 1);
+    let w; do { w = CODE_WORDS[Math.floor(Math.random() * CODE_WORDS.length)]; } while (cur.toUpperCase() === w && CODE_WORDS.length > 1);
     $('#cword').value = w;
-    pickedEmoji = CODE_EMOJI[Math.floor(Math.random() * CODE_EMOJI.length)]; drawEmoji();
   };
   const busyBtn = (id, on, label) => { const el = $(id); el.disabled = on; if (label) el.textContent = label; };
   $('#tsend').onclick = async () => {
@@ -140,7 +132,7 @@ boot('admin').then(({ profile }) => {
     if (word.length < 2) return showMsg($('#cmsg'), 'Type a code word (2–14 characters) or tap Random.');
     $('#csave').disabled = true; $('#csave').textContent = 'Saving…';
     try {
-      const { error } = await sb.rpc('set_week_code', { p_word: word, p_emoji: pickedEmoji });
+      const { error } = await sb.rpc('set_week_code', { p_word: word, p_emoji: '' });
       if (error) throw new Error(error.message);
       let msg = 'Code saved. The live website card shows it now.';
       if (passCount) {

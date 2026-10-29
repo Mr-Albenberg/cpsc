@@ -52,10 +52,12 @@ export const wwReady = () => !!WW_KEY;
 const wwHeaders = () => ({ Authorization: `Bearer ${WW_KEY}`, 'Content-Type': 'application/json' });
 type WWCache = { v: 3; serial: string; googleSaveUrl: string; token: string; passType: string; sig: string };
 
+const titleCase = (w: string) => w.toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+
 export async function currentCode(): Promise<{ word: string; emoji: string; text: string }> {
   const { data } = await db.from('club_settings').select('week_word,week_emoji').eq('id', 1).maybeSingle();
-  const word = data?.week_word || 'POWDER', emoji = data?.week_emoji || '🏔️';
-  return { word, emoji, text: `${emoji} ${word}`.trim() };
+  const word = data?.week_word || 'POWDER';
+  return { word, emoji: '', text: titleCase(word) };
 }
 
 function season() {
@@ -68,41 +70,28 @@ const memberNo = (p: Profile) => (p.member_no ? '#' + String(p.member_no).padSta
 const CLUB = 'https://cpsconline.com';
 
 // Bump LAYOUT when the pass design changes so existing passes get the new look on their next update.
-const LAYOUT = 'L3';
+const LAYOUT = 'L4';
 export const sigOf = (p: Profile, code: string) => [LAYOUT, p.name, memberNo(p), p.is_admin ? 'exec' : 'member', code].join('|');
 
 export function wwBody(p: Profile, code: string, thumbUri?: string) {
-  const portal = (SITE_URL || 'https://mr-albenberg.github.io/cpsc') + '/card.html';
   const no = memberNo(p);
-  const since = String(new Date(p.created_at).getFullYear());
   return {
-    logoText: `${SHORT} ❄ SLO`,
+    logoText: SHORT,
     organizationName: ORG,
     description: `${ORG} — ${p.name}'s membership card`,
     colorPreset: env('WALLETWALLET_COLOR') || 'blue',
     colorPro: BG,                 // paid plan only (ignored on free)
     thumbnailURLPro: thumbUri,    // paid plan only (ignored on free)
-    headerFields: [{ label: 'THIS WEEK', value: code }],
+    headerFields: [{ label: 'SEASON', value: season() }],
     primaryFields: [{ label: p.is_admin ? 'EXEC BOARD' : 'SKI CLUB MEMBER', value: p.name }],
     secondaryFields: [
       ...(no ? [{ label: 'MEMBER', value: no }] : []),
-      { label: 'SEASON', value: season() },
-      { label: 'SINCE', value: since },
-    ],
-    backFields: [
-      { label: '🔐 Check-in code', value: `This week's code is ${code}. It changes regularly and updates on its own — a card without the current code isn't valid. Door staff also scan your QR to see your photo.` },
-      { label: '🏔️ Central Pacific Ski Club', value: 'Live to ski, love to party. San Luis Obispo\'s ski & snowboard club — all levels welcome. Big Trip every winter break, weekend trips all season, weekly events year-round.' },
-      { label: '👤 Member', value: [p.name, no, `member since ${since}`].filter(Boolean).join(' · ') },
-      { label: '🪪 Your card & photo', value: portal },
-      { label: '🎿 Trips & events', value: `${CLUB}/small-trip-info-page/` },
-      { label: '✈️ Big Trip 2027', value: `${CLUB}/big-trip-2027/` },
-      { label: '💸 Member discounts', value: `${CLUB}/membership-discounts/` },
-      { label: '🧑‍🤝‍🧑 Exec board', value: `${CLUB}/exec-board-26-27/` },
-      { label: '🌐 cpsconline.com', value: CLUB },
+      { label: 'SINCE', value: String(new Date(p.created_at).getFullYear()) },
     ],
     barcodeValue: QR(p.serial),
     barcodeFormat: 'QR',
-    barcodeAltText: [no, p.name].filter(Boolean).join(' · ').slice(0, 128),
+    // The check-in code sits quietly in the small line under the QR code
+    barcodeAltText: [no, code].filter(Boolean).join(' · ').slice(0, 128),
   };
 }
 
@@ -443,7 +432,7 @@ export async function handler(req: Request): Promise<Response> {
           return json({ code: (await currentCode()).text, serial: c.serial });
         }
         const t = new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
-        const testCode = `🧪 TEST ${t}`;
+        const testCode = `Test ${t}`;
         const phones = await wwUpdate(serial, wwBody(p, testCode, await thumbFor(p.id)));
         if (phones === null) return json({ error: 'That pass no longer exists. Tap Add to Wallet on your card page to get a fresh one.' }, 410);
         await track(p.id, serial);

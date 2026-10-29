@@ -88,7 +88,8 @@
   };
   window.getWeekCode = async function () {
     const { data } = await sb.from('club_settings').select('week_word,week_emoji,updated_at').eq('id', 1).maybeSingle();
-    return data ? { word: data.week_word, emoji: data.week_emoji, text: `${data.week_emoji} ${data.week_word}`.trim(), updatedAt: data.updated_at } : null;
+    const title = (w) => w.toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+    return data ? { word: data.week_word, text: title(data.week_word), updatedAt: data.updated_at } : null;
   };
 
   window.$ = (s) => document.querySelector(s);

@@ -79,8 +79,8 @@ Copy a file as base64 on Windows (PowerShell): `[Convert]::ToBase64String([IO.Fi
 **Never commit certificate or key files to this repo** — it's public.
 
 ## Check-in code (spotting copied cards)
-Admins set a code word + emoji on `admin.html` (e.g. 🎿 BLUEBIRD). It appears:
-- on every member's **wallet pass** (top right, "THIS WEEK") — passes update themselves on members' phones, nobody re-adds anything;
+Admins set a code word on `admin.html` (e.g. Bluebird). It appears:
+- on every member's **wallet pass**, quietly, in the small line under the QR code (e.g. "#0002 · Bluebird") — passes update themselves on members' phones, nobody re-adds anything;
 - on the **live strip** of the website card, next to a clock ticking in seconds and a moving holographic shimmer (a screenshot freezes);
 - on the **scanner**, so door staff know what to look for.
 
@@ -90,7 +90,7 @@ Database: run [`supabase/migrations/002_weekly_code.sql`](supabase/migrations/00
 
 **One working pass per member.** Every pass issued is recorded. Whenever a member adds their card to Apple or Google Wallet, any older CPSC pass they were issued is voided: iPhone greys it out and moves it to Expired Passes, and Google Wallet revokes it. Removing a member voids all of theirs.
 
-**Testing live updates.** On `admin.html`, *Test on your phone* sends a test word (e.g. 🧪 TEST 5:04 PM) to your own pass only — watch it change in Wallet without re-adding — then *Put the real code back*. Each press uses one WalletWallet update.
+**Testing live updates.** On `admin.html`, *Test on your phone* sends a test word (e.g. Test 5:04 PM) to your own pass only — watch it change in Wallet without re-adding — then *Put the real code back*. Each press uses one WalletWallet update.
 
 Database: also run [`supabase/migrations/003_wallet_pass_history.sql`](supabase/migrations/003_wallet_pass_history.sql) and [`004_member_numbers.sql`](supabase/migrations/004_member_numbers.sql) (already done for the live project).
 
