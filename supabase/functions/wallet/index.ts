@@ -301,7 +301,7 @@ const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 
 // Per-pass secret the phone sends back ("ApplePass <token>"). Derived from a long-lived secret in the
 // database (not the signing key), so renewing the certificate never breaks existing passes.
-let passSecret: Uint8Array | null = null;
+let passSecret: Uint8Array<ArrayBuffer> | null = null;
 async function passSecretBytes() {
   if (!passSecret) {
     const { data } = await db.from('pass_secrets').select('secret').eq('id', 1).maybeSingle();
