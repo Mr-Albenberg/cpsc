@@ -345,12 +345,16 @@ export async function buildApplePass(p: Profile, thumb: Buffer | null, code: str
     // name and member info on the strip by the QR code. Older iPhones use `generic` above.
     posterGeneric: {
       headerFields: [{ key: 'code', value: voided ? 'Ended' : code }],
-      primaryFields: [{ key: 'name', label: 'LIVE TO SKI, LOVE TO PARTY', value: p.name }],
+      // name on the left, season on the right of the same row
+      primaryFields: [
+        { key: 'name', label: 'LIVE TO SKI, LOVE TO PARTY', value: p.name },
+        ...(voided ? [] : [{ key: 'season', label: 'SEASON', value: season(), textAlignment: 'PKTextAlignmentRight' }]),
+      ],
       footerFields: voided
         ? [{ key: 'status', value: 'Membership ended' }]
-        : [{ key: 'info', value: [no, p.is_admin ? 'Exec Board' : 'Member', season()].filter(Boolean).join(' · ') }],
+        : [{ key: 'info', value: [no, p.is_admin ? 'Exec Board' : 'Member'].filter(Boolean).join(' · ') }],
     },
-    barcodes: [{ format: 'PKBarcodeFormatQR', message: QR(voided ? 'void' : p.serial), messageEncoding: 'iso-8859-1', altText: ORG }],
+    barcodes: [{ format: 'PKBarcodeFormatQR', message: QR(voided ? 'void' : p.serial), messageEncoding: 'iso-8859-1' }],
   };
   if (voided) passJson.voided = true;
   const icon = await siteImage('apple-touch-icon.png');
@@ -385,7 +389,7 @@ async function settingsInfo() {
 }
 const ms = (t?: string | null) => (t ? Date.parse(t) : 0);
 // Bump this (to the current time) whenever the pass design changes; phones then fetch the new look.
-const DESIGN_AT = Date.parse('2026-10-29T20:18:00Z');
+const DESIGN_AT = Date.parse('2026-10-29T20:25:00Z');
 
 // The pass for a serial, as of now (null if it never existed)
 async function applePassBySerial(serial: string): Promise<{ buf: Buffer; modified: number } | null> {
