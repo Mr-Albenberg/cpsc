@@ -99,6 +99,9 @@ iPhone passes are signed with the club's Pass Type ID **pass.com.cpsc.membership
 
 Function secrets: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `APPLE_WWDR_B64`, `APPLE_SIGNER_CERT_B64`, `APPLE_SIGNER_KEY_B64` (base64 of the PEM files). The certificate expires **Nov 28, 2027** — before then, make a new Pass Type ID certificate in the Apple developer portal (a new key is fine) and replace `APPLE_SIGNER_CERT_B64` / `APPLE_SIGNER_KEY_B64`. Existing passes keep updating because their update passwords come from `pass_secrets`, not the certificate. Database: run [`005_apple_pass_updates.sql`](supabase/migrations/005_apple_pass_updates.sql) and [`006_pass_auth_secret.sql`](supabase/migrations/006_pass_auth_secret.sql).
 
+## Poster layout (iOS 27+)
+On iPhones running iOS 27 or later the pass uses Apple's poster layout: full-bleed artwork (`img/pass/background*.png` / `artwork*.png` — the CPSC skier poster recolored to club black and lime, sponsorship text removed), the lime logo top left (`img/pass/primaryLogo*.png`), the check-in word top right, and the member's name, number and season on the strip by the QR code. Older iPhones show the regular lime pass. To change the artwork, replace those PNGs (same sizes) and push; passes pick it up on their next update.
+
 ## Club branding
 The look comes from cpsconline.com: lime header (`#ecffb0`), the black CPSC mountain logo, Bebas Neue headings and buttons, Questrial text, black buttons, and the homepage group photo on the login and sign-up pages. Logo files live in `img/` (`logo.png` black, `logo-white.png` for dark backgrounds, `icon.png` square). Wallet passes use the dark preset on WalletWallet's free plan; on a paid plan they automatically switch to the club color and the real logo.
 

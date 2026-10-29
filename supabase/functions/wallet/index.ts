@@ -341,6 +341,18 @@ export async function buildApplePass(p: Profile, thumb: Buffer | null, code: str
             { key: 'since', label: 'SINCE', value: String(new Date(p.created_at).getFullYear()) },
           ],
     },
+    // iOS 27+ poster layout: full-bleed club artwork (skier + CPSC logo in lime), word top right,
+    // name and member info on the strip by the QR code. Older iPhones use `generic` above.
+    posterGeneric: {
+      headerFields: [{ key: 'code', value: voided ? 'Ended' : code }],
+      primaryFields: [{ key: 'name', label: 'LIVE TO SKI, LOVE TO PARTY', value: p.name }],
+      footerFields: voided
+        ? [{ key: 'status', value: 'Membership ended' }]
+        : [
+            { key: 'no', value: [no, p.is_admin ? 'Exec Board' : 'Member'].filter(Boolean).join(' · ') },
+            { key: 'season', value: `${season()} season` },
+          ],
+    },
     barcodes: [{ format: 'PKBarcodeFormatQR', message: QR(voided ? 'void' : p.serial), messageEncoding: 'iso-8859-1', altText: ORG }],
   };
   if (voided) passJson.voided = true;
@@ -351,6 +363,10 @@ export async function buildApplePass(p: Profile, thumb: Buffer | null, code: str
     'logo.png': await siteImage('pass-logo.png'),          // the CPSC mountain logo from cpsconline.com
     'logo@2x.png': await siteImage('pass-logo@2x.png'),
   };
+  // Poster artwork + lime logo (Apple's docs name the poster image both ways, so include both)
+  for (const base of ['background', 'artwork', 'primaryLogo']) {
+    for (const scale of ['', '@2x', '@3x']) files[`${base}${scale}.png`] = await siteImage(`pass/${base}${scale}.png`);
+  }
   if (thumb && !voided) { files['thumbnail.png'] = thumb; files['thumbnail@2x.png'] = thumb; }   // member photo
   const pass = new PKPass(files, {
     wwdr: secret('APPLE_WWDR')!,
