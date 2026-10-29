@@ -107,10 +107,13 @@ async function loadCode() {
   if (!c) return;
   $('#codeNow').textContent = c.text;
   $('#codeMeta').textContent = 'Set ' + fmtTime(c.updatedAt);
-  try { passCount = (await fnCall({ kind: 'count' })).passes; } catch { passCount = 0; }
-  $('#cnote').textContent = passCount
-    ? `Updates ${passCount} wallet pass${passCount === 1 ? '' : 'es'} on members' phones automatically — uses ${passCount} of your 1,000 free pass updates this month.`
-    : 'No one has added a wallet pass yet. The website card updates right away.';
+  let applePhones = 0;
+  try { const n = await fnCall({ kind: 'count' }); passCount = n.passes || 0; applePhones = n.applePhones || 0; } catch { passCount = 0; }
+  window.__applePhones = applePhones;
+  const parts = [];
+  if (applePhones) parts.push(`${applePhones} iPhone${applePhones === 1 ? '' : 's'} with the card update right away (free, no limit)`);
+  if (passCount) parts.push(`${passCount} other pass${passCount === 1 ? '' : 'es'} use ${passCount} of your 1,000 free monthly WalletWallet updates`);
+  $('#cnote').textContent = parts.length ? parts.join(' · ') + '.' : 'No one has added a wallet pass yet. The website card updates right away.';
 }
 boot('admin').then(({ profile }) => {
   myId = profile.id;
@@ -147,8 +150,8 @@ boot('admin').then(({ profile }) => {
       const { error } = await sb.rpc('set_week_code', { p_word: word, p_emoji: '' });
       if (error) throw new Error(error.message);
       let msg = 'Code saved. The live website card shows it now.';
-      if (passCount) {
-        $('#csave').textContent = `Updating ${passCount} pass${passCount === 1 ? '' : 'es'}…`;
+      if (passCount || window.__applePhones) {
+        $('#csave').textContent = 'Updating passes…';
         const r = await fnCall({ kind: 'refresh' });
         msg = `Code saved and ${r.updated} wallet pass${r.updated === 1 ? '' : 'es'} updated` + (r.phones ? ` (${r.phones} phone${r.phones === 1 ? '' : 's'} notified)` : '') + '.';
         if (r.quotaHit) msg += ' Some passes weren\'t updated because the free monthly limit was reached.';

@@ -94,6 +94,11 @@ Database: run [`supabase/migrations/002_weekly_code.sql`](supabase/migrations/00
 
 Database: also run [`supabase/migrations/003_wallet_pass_history.sql`](supabase/migrations/003_wallet_pass_history.sql) and [`004_member_numbers.sql`](supabase/migrations/004_member_numbers.sql) (already done for the live project).
 
+## Apple Wallet with the club certificate
+iPhone passes are signed with the club's Pass Type ID **pass.com.cpsc.membership** (team 3CND973Q82): club lime, the real CPSC logo, the member's photo, and the check-in word top right. The `wallet` function also acts as Apple's PassKit web service — phones register when they add the pass, and get a push whenever the word, the member's photo, or their status changes, so nobody re-adds anything. Updates are free and unlimited. Android/Google Wallet still goes through WalletWallet.
+
+Function secrets: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `APPLE_WWDR_B64`, `APPLE_SIGNER_CERT_B64`, `APPLE_SIGNER_KEY_B64` (base64 of the PEM files). The certificate expires **Nov 28, 2027** — renew it in the Apple developer portal before then (same key works), or pushes stop. Database: run [`005_apple_pass_updates.sql`](supabase/migrations/005_apple_pass_updates.sql).
+
 ## Club branding
 The look comes from cpsconline.com: lime header (`#ecffb0`), the black CPSC mountain logo, Bebas Neue headings and buttons, Questrial text, black buttons, and the homepage group photo on the login and sign-up pages. Logo files live in `img/` (`logo.png` black, `logo-white.png` for dark backgrounds, `icon.png` square). Wallet passes use the dark preset on WalletWallet's free plan; on a paid plan they automatically switch to the club color and the real logo.
 
