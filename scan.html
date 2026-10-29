@@ -10,18 +10,38 @@
   <div class="panel" style="padding:14px">
     <div id="reader"></div>
     <div class="center" style="margin-top:12px"><button class="btn" id="start" type="button">Start camera</button></div>
+    <p class="hint center" id="ready" hidden>Ready — hold a pass in front of the camera.</p>
     <details class="manual"><summary>No camera? Upload a photo of the QR code</summary>
       <input type="file" id="qrfile" accept="image/*"></details>
   </div>
-  <div class="result" id="result">
-    <div class="status" id="status"></div>
-    <div class="status-sub" id="statusSub"></div>
-    <img id="rphoto" alt="">
-    <div class="name" id="rname"></div>
-    <div class="rnum" id="rnum"></div>
-    <dl class="profile" id="rprofile"></dl>
-    <div class="code-check" id="rcode"></div>
-    <button class="btn dark" id="next" type="button">Scan next</button>
+</div>
+<div class="scan-overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+  <div class="ov-body">
+    <div class="ov-icon" id="ovIcon" aria-hidden="true"></div>
+    <div class="ov-title" id="ovTitle"></div>
+    <div class="ov-sub" id="ovSub"></div>
+    <div class="ov-member" id="ovMember">
+      <img id="ovPhoto" alt="">
+      <div><div class="ov-name" id="ovName"></div><div class="ov-num" id="ovNum"></div></div>
+    </div>
+  </div>
+  <div class="ov-actions">
+    <button class="btn ov-info" id="ovInfo" type="button">Info</button>
+    <div class="ov-tap">Tap anywhere to scan the next pass</div>
+  </div>
+</div>
+<div class="info-sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shName" hidden>
+  <div class="sheet-card">
+    <div class="sheet-status" id="shStatus"></div>
+    <img id="shPhoto" alt="">
+    <div class="name" id="shName"></div>
+    <div class="rnum" id="shNum"></div>
+    <dl class="profile" id="shProfile"></dl>
+    <div class="code-check" id="shCode"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="shBack" type="button">Back</button>
+      <button class="btn dark" id="shNext" type="button">Scan next</button>
+    </div>
   </div>
 </div>
 </main>
@@ -29,12 +49,13 @@
   <img src="img/logo-white.png" alt="CPSC">
   <div class="tag">Live to ski, love to party</div>
   <nav class="links" aria-label="Central Pacific Ski Club">
-    <a href="https://cpsconline.com/about/">About</a>
-    <a href="https://cpsconline.com/small-trip-info-page/">Events</a>
-    <a href="https://cpsconline.com/big-trip-2027/">Big Trip 2027</a>
-    <a href="https://cpsconline.com/sponsors/">Sponsors</a>
-    <a href="https://cpsconline.com/membership-discounts/">Member Discounts</a>
-    <a href="https://cpsconline.com/exec-board-26-27/">Exec Board</a>
+    <a href="about.html">About</a>
+    <a href="events.html">Events</a>
+    <a href="big-trip.html">Big Trip 2027</a>
+    <a href="ikon.html">Ikon Pass</a>
+    <a href="sponsors.html">Sponsors</a>
+    <a href="join.html">Join</a>
+    <a href="card.html">My Card</a>
   </nav>
   <div>Central Pacific Ski Club · San Luis Obispo · <a href="https://cpsconline.com" style="color:#fff">cpsconline.com</a></div>
 </footer>
@@ -45,69 +66,95 @@
 <script>
 boot('admin').then(() => {
   const scanner = new Html5Qrcode('reader');
-  let weekCode = null;
+  let weekCode = null, busy = false, last = null;
   const loadCode = async () => { weekCode = await getWeekCode(); if (weekCode) $('#scanCode').innerHTML = 'Real cards show <b>' + esc(weekCode.text) + '</b> in the top corner'; };
   loadCode(); setInterval(loadCode, 60000);
-  let busy = false, timer;
   const beep = (ok) => {
     try { const c = new AudioContext(), o = c.createOscillator(); o.frequency.value = ok ? 880 : 220; o.connect(c.destination); o.start(); o.stop(c.currentTime + 0.15); } catch {}
     navigator.vibrate?.(ok ? 80 : [60, 40, 60]);
   };
   const row = (k, v) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
-  function show(state, title, sub) {
-    $('#result').className = 'result show ' + state;
-    $('#status').textContent = title;
-    $('#statusSub').textContent = sub || '';
+  const ICON = { ok: '✓', warn: '!', bad: '✕' };
+
+  function show(state, title, sub, m, photo) {
+    last = { state, title, sub, m, photo };
+    const ov = $('#overlay');
+    ov.className = 'scan-overlay ' + state; ov.hidden = false;
+    $('#ovIcon').textContent = ICON[state];
+    $('#ovTitle').textContent = title;
+    $('#ovSub').textContent = sub || '';
+    $('#ovMember').style.display = m ? '' : 'none';
+    $('#ovInfo').style.display = m ? '' : 'none';
+    if (m) {
+      $('#ovName').textContent = m.name;
+      $('#ovNum').textContent = numLine(m);
+      $('#ovPhoto').style.visibility = photo ? '' : 'hidden';
+      if (photo) $('#ovPhoto').src = photo;
+    }
+    document.body.classList.add('no-scroll');
   }
-  function bad(text) {
-    show('bad', '✕ Not valid', text);
-    $('#rphoto').style.display = 'none';
-    $('#rname').textContent = ''; $('#rnum').textContent = '';
-    $('#rprofile').innerHTML = ''; $('#rcode').innerHTML = '';
-    beep(false);
+  const numLine = (m) => [m.memberNo ? '#' + String(m.memberNo).padStart(4, '0') : '', m.isAdmin ? 'Exec board' : 'Member'].filter(Boolean).join(' · ');
+
+  function openInfo() {
+    const { state, title, m, photo, r } = last;
+    $('#shStatus').className = 'sheet-status ' + state;
+    $('#shStatus').textContent = ICON[state] + ' ' + title;
+    $('#shPhoto').style.display = photo ? '' : 'none';
+    if (photo) $('#shPhoto').src = photo;
+    $('#shName').textContent = m.name;
+    $('#shNum').textContent = numLine(m);
+    $('#shProfile').innerHTML =
+      row('Email', m.email) +
+      row('Member since', m.since ? new Date(m.since).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—') +
+      row('Last scanned', r.lastScan ? fmtTime(r.lastScan) + (r.lastScannedBy ? ' by ' + r.lastScannedBy : '') : 'Never (this is the first)') +
+      row('Check-ins', r.totalScans + ' total' + (r.scansLast24h ? ` · ${r.scansLast24h + 1} in the last 24 h` : '')) +
+      row('Role', m.isAdmin ? 'Exec board / admin' : 'Member');
+    $('#shCode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> in the top corner, a live ticking clock on the website card, and match this photo.' : 'Make sure the photo matches the person.';
+    $('#overlay').hidden = true;
+    $('#sheet').hidden = false;
   }
+
+  function bad(text) { show('bad', 'Not valid', text); beep(false); }
+
   async function onScan(code) {
     if (busy) return; busy = true;
     try { scanner.pause(true); } catch {}
     const { data: r, error } = await sb.rpc('scan_card', { p_code: code });
-    if (error) bad(error.message);
-    else if (!r.valid) bad(r.error);
-    else {
-      const m = r.member;
-      if (r.scannedWithin24h) show('warn', '! Already checked in today', 'Valid member, but this card was scanned ' + fmtTime(r.lastScan).split(' · ')[1] + (r.lastScannedBy ? ' by ' + r.lastScannedBy : '') + '.');
-      else show('', '✓ Valid member', r.lastScan ? 'First check-in today.' : 'First check-in ever — welcome!');
-      $('#rname').textContent = m.name;
-      $('#rnum').textContent = [m.memberNo ? '#' + String(m.memberNo).padStart(4, '0') : '', m.isAdmin ? 'Exec board' : 'Member'].filter(Boolean).join(' · ');
-      $('#rprofile').innerHTML =
-        row('Email', m.email) +
-        row('Member since', m.since ? new Date(m.since).toLocaleDateString([], { month: 'short', year: 'numeric' }) : '—') +
-        row('Last scanned', r.lastScan ? fmtTime(r.lastScan) : 'Never') +
-        row('Check-ins', r.totalScans + ' total' + (r.scansLast24h ? ` · ${r.scansLast24h + 1} in the last 24 h` : ''));
-      $('#rcode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> in the top corner and match this photo.' : '';
-      const url = await signedPhoto(m.id);
-      $('#rphoto').style.display = url ? '' : 'none';
-      if (url) $('#rphoto').src = url;
-      beep(!r.scannedWithin24h);
-    }
-    $('#result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    clearTimeout(timer); timer = setTimeout(next, 10000);
+    if (error) return bad(error.message);
+    if (!r.valid) return bad(r.error);
+    const m = r.member;
+    const photo = await signedPhoto(m.id).catch(() => null);
+    if (r.scannedWithin24h) show('warn', 'Already checked in', 'Valid member, but this card was scanned ' + fmtTime(r.lastScan).split(' · ')[1] + (r.lastScannedBy ? ' by ' + r.lastScannedBy : '') + '.', m, photo);
+    else show('ok', 'Valid member', r.lastScan ? 'First check-in today.' : 'First check-in ever — welcome!', m, photo);
+    last.r = r;
+    beep(!r.scannedWithin24h);
   }
+
   function next() {
-    clearTimeout(timer); $('#result').className = 'result'; busy = false;
+    $('#overlay').hidden = true; $('#sheet').hidden = true;
+    document.body.classList.remove('no-scroll');
+    busy = false; last = null;
     try { scanner.resume(); } catch {}
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-  $('#next').onclick = next;
+  $('#overlay').onclick = next;
+  $('#ovInfo').onclick = (e) => { e.stopPropagation(); openInfo(); };
+  $('#shNext').onclick = next;
+  $('#shBack').onclick = () => { $('#sheet').hidden = true; $('#overlay').hidden = false; };
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#sheet').hidden) $('#shBack').click();
+    else if ((e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') && !$('#overlay').hidden) { e.preventDefault(); next(); }
+  });
+
   $('#qrfile').onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
     try { const text = await scanner.scanFile(f, false); busy = false; onScan(text); }
-    catch { busy = false; bad("Couldn't find a QR code in that picture."); }
+    catch { busy = true; bad("Couldn't find a QR code in that picture."); }
     e.target.value = '';
   };
   $('#start').onclick = async () => {
     try {
       await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } }, onScan);
-      $('#start').style.display = 'none';
+      $('#start').style.display = 'none'; $('#ready').hidden = false;
     } catch (e) { alert('Could not open the camera: ' + e + '\nAllow camera access for this site and try again.'); }
   };
 }).catch(() => {});

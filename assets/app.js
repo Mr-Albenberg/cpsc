@@ -9,18 +9,27 @@
 
   const here = location.pathname.split('/').pop() || 'index.html';
 
+  // Club pages (content from cpsconline.com) + account links for who's logged in
+  const CLUB = [['home.html', 'Home'], ['about.html', 'About'], ['events.html', 'Events'], ['big-trip.html', 'Big Trip'],
+    ['ikon.html', 'Ikon Pass'], ['sponsors.html', 'Sponsors'], ['join.html', 'Join']];
   function renderHeader(nav) {
-    const links = {
-      guest: [['index.html', 'Log in'], ['signup.html', 'Create account']],
+    const acct = {
+      guest: [['index.html', 'Log in']],
       member: [['card.html', 'My card']],
       admin: [['card.html', 'My card'], ['admin.html', 'Members'], ['scan.html', 'Scan']],
     }[nav] || [];
+    const a = ([h, t], cls = '') => `<a href="${h}" class="${cls}${here === h ? ' active' : ''}"${here === h ? ' aria-current="page"' : ''}>${t}</a>`;
     let header = document.querySelector('.site-header');
     if (!header) { header = document.createElement('header'); header.className = 'site-header'; document.body.prepend(header); }
     header.innerHTML = `<div class="inner">
-      <a class="brand" href="${nav === 'guest' ? 'index.html' : 'card.html'}"><img src="img/logo.png" alt="CPSC" onerror="this.parentNode.classList.add('no-logo')"><span class="mark">CPSC</span><span>Central Pacific Ski Club</span></a>
-      <nav class="nav">${links.map(([h, t]) => `<a href="${h}" class="${here === h ? 'active' : ''}">${t}</a>`).join('')}
-      ${nav !== 'guest' ? '<button id="logout" type="button">Log out</button>' : ''}</nav></div>`;
+      <a class="brand" href="home.html"><img src="img/logo.png" alt="CPSC" onerror="this.parentNode.classList.add('no-logo')"><span class="mark">CPSC</span><span>Central Pacific Ski Club</span></a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="siteNav"><span></span><span></span><span></span><b>Menu</b></button>
+      <nav class="nav" id="siteNav" aria-label="Main">
+        <div class="nav-club">${CLUB.map((l) => a(l)).join('')}</div>
+        <div class="nav-acct">${acct.map((l) => a(l, 'acct')).join('')}${nav !== 'guest' ? '<button id="logout" type="button">Log out</button>' : ''}</div>
+      </nav></div>`;
+    const btn = header.querySelector('.menu-btn');
+    btn.onclick = () => { const open = header.classList.toggle('open'); btn.setAttribute('aria-expanded', open); };
     const lo = document.getElementById('logout');
     if (lo) lo.onclick = async () => { await sb.auth.signOut(); location.href = 'index.html'; };
   }
@@ -32,12 +41,17 @@
       Supabase project URL and anon key (Supabase → Project Settings → API). See the README for the full setup.</p></div>`;
   }
 
-  // need: 'guest' | 'member' | 'admin' | 'any'
+  // need: 'guest' | 'member' | 'admin' | 'any' | 'public'
   window.boot = async function (need) {
     renderHeader('guest');
     if (!sb) { showSetup(); throw new Error('not configured'); }
     const { data: { session } } = await sb.auth.getSession();
     if (need === 'any') return { session };
+    if (need === 'public') { // club pages: open to everyone, header shows the right account links
+      if (session) sb.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle()
+        .then(({ data }) => data && renderHeader(data.is_admin ? 'admin' : 'member'));
+      return { session };
+    }
     if (need === 'guest') {
       if (session) { location.replace('card.html'); throw new Error('redirect'); }
       return {};

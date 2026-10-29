@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ecffb0"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Questrial&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>Ikon Pass · Central Pacific Ski Club</title></head>
+<body>
+
+<main class="club">
+
+<section class="club-hero short" style="background-image:url(img/site/group-snow-2.webp)">
+  <div class="wrap">
+    <div class="kicker">Ikon Pass 2026/2027</div>
+    <h1>Ikon Pass<br><em>now on sale</em></h1>
+    <p>Our discounted Ikon Pass for 2026–2027 is NOW ON SALE. Get yours through CPSC today!</p>
+    <div class="btn-row"><a class="btn lime lg" href="https://outsidelifegw.com/Register/1978/IkonPassSale20262027/Spruill/SLOSophieSpruill2026/Sophiecspruill29@gmail.com" target="_blank" rel="noopener">2026/2027 Ikon Pass ↗</a></div>
+  </div>
+</section>
+<section class="sec"><div class="wrap split">
+  <div>
+    <div class="kicker">Member deal</div>
+    <h2 class="big">Discounted through CPSC</h2>
+    <p class="lead">Lock in the 2026–2027 Ikon Pass at the club rate before it’s gone. Big Trip 2027 at Copper is an Ikon mountain, so your pass gets plenty of use.</p>
+    <ul class="checks"><li>Club-discounted price for the 2026/27 season</li><li>Buy online through our booking partner</li><li>Ride with CPSC all winter</li></ul>
+    <div class="btn-row"><a class="btn lg" href="https://outsidelifegw.com/Register/1978/IkonPassSale20262027/Spruill/SLOSophieSpruill2026/Sophiecspruill29@gmail.com" target="_blank" rel="noopener">Get your pass ↗</a><a class="btn ghost lg" href="big-trip.html">Big Trip 2027</a></div>
+  </div>
+  <img src="img/site/ikon-banner.webp" alt="Ikon Pass — sign up now, 2026-2027 passes on sale" width="1600" height="900" class="rounded" loading="lazy" decoding="async">
+</div></section>
+<section class="sec tight"><div class="wrap"><div class="cta-band">
+  <div><h2>Already a <em>member?</em></h2><p>Your digital membership card lives in Apple Wallet or Google Wallet.</p></div>
+  <div class="btn-row" style="margin:0"><a class="btn lime lg" href="card.html">My card</a><a class="btn ghost lg" style="color:#fff;border-color:#fff" href="join.html">Join CPSC</a></div>
+</div></div></section>
+
+</main>
+<footer class="site-footer">
+  <img src="img/logo-white.png" alt="CPSC">
+  <div class="tag">Live to ski, love to party</div>
+  <nav class="links" aria-label="Central Pacific Ski Club">
+    <a href="about.html">About</a>
+    <a href="events.html">Events</a>
+    <a href="big-trip.html">Big Trip 2027</a>
+    <a href="ikon.html">Ikon Pass</a>
+    <a href="sponsors.html">Sponsors</a>
+    <a href="join.html">Join</a>
+    <a href="card.html">My Card</a>
+  </nav>
+  <div>Central Pacific Ski Club · San Luis Obispo · <a href="https://cpsconline.com" style="color:#fff">cpsconline.com</a></div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+boot('public').catch(() => {});
+// Tap a flyer to see it big
+const lb = document.getElementById('lightbox');
+if (lb) {
+  const big = lb.querySelector('img');
+  document.querySelectorAll('.gallery button').forEach((b) => b.onclick = () => {
+    const i = b.querySelector('img'); big.src = i.src; big.alt = i.alt; lb.hidden = false; lb.focus();
+  });
+  lb.onclick = () => { lb.hidden = true; };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.hidden = true; });
+}
+// Events that already happened switch to "past"
+document.querySelectorAll('[data-ends]').forEach((el) => {
+  if (Date.now() > Date.parse(el.dataset.ends)) el.classList.add('is-past');
+});
+</script>
+</body></html>

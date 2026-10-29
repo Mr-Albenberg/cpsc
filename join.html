@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ecffb0"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Questrial&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>Join · Central Pacific Ski Club</title></head>
+<body>
+
+<main class="club">
+
+<section class="club-hero short" style="background-image:url(img/site/group-snow.webp)">
+  <div class="wrap">
+    <div class="kicker">Membership 2026–2027</div>
+    <h1>Get <em>sendy</em></h1>
+    <p>Ok, you’ve sold me — but how do I join? Awesome, we are beyond excited to have you!</p>
+  </div>
+</section>
+<section class="sec"><div class="wrap">
+  <div class="kicker">One-time fee · whole school year</div>
+  <h2 class="big">Membership</h2>
+  <div class="prices">
+    <div class="price-card hot"><div class="tag">New members</div><b>$55.69</b><p>Good for the entire 2026–2027 school year.</p></div>
+    <div class="price-card"><div class="tag">Returning members</div><b>$50.69</b><p>Welcome back — same perks, lower price.</p></div>
+    <div class="price-card"><div class="tag">Spring membership</div><b>$25.69</b><p>Resets before fall — you’d pay the full-year fee again next fall.</p></div>
+  </div>
+  <div class="split" style="margin-top:48px;align-items:start">
+    <div>
+      <h3 style="font-size:2rem;margin:0 0 4px">Every membership includes</h3>
+      <ul class="checks"><li>A CPSC 2026–2027 membership shirt</li><li>Dozens of exclusive discount codes from our <a href="sponsors.html">sponsors</a></li><li>Access to every party, small trip and the Big Trip</li><li>Your digital membership card in Apple Wallet or Google Wallet</li></ul>
+      <p class="lead" style="margin-top:18px">Thanks so much for joining our club and get ready for an awesome year of partying, skiing and debauchery!</p>
+    </div>
+    <div class="card">
+      <div class="tag">How to join</div>
+      <ol class="steps">
+        <li><span>1</span><div><strong>Pay the membership fee</strong><br>Fill out the form and pay on cpsconline.com.</div></li>
+        <li><span>2</span><div><strong>Get approved</strong><br>The exec board adds your email to the member list.</div></li>
+        <li><span>3</span><div><strong>Create your account</strong><br>Sign up here with that email and add a photo.</div></li>
+        <li><span>4</span><div><strong>Add your card to your wallet</strong><br>Show the QR at the door to check in.</div></li>
+      </ol>
+      <div class="btn-row"><a class="btn lg" href="https://cpsconline.com/join/" target="_blank" rel="noopener">Pay &amp; join ↗</a><a class="btn ghost lg" href="signup.html">Create account</a></div>
+    </div>
+  </div>
+  <p class="fine" style="margin-top:36px">*Please note that membership fees are not refundable. You are responsible for attending events and getting the most out of your membership.<br>
+  *If you are paying our spring membership fee ($25.69), please note our membership resets before fall. If you wish to still be a member the following fall, you must pay for the full-priced, full-year membership when it is reset.</p>
+</div></section>
+
+</main>
+<footer class="site-footer">
+  <img src="img/logo-white.png" alt="CPSC">
+  <div class="tag">Live to ski, love to party</div>
+  <nav class="links" aria-label="Central Pacific Ski Club">
+    <a href="about.html">About</a>
+    <a href="events.html">Events</a>
+    <a href="big-trip.html">Big Trip 2027</a>
+    <a href="ikon.html">Ikon Pass</a>
+    <a href="sponsors.html">Sponsors</a>
+    <a href="join.html">Join</a>
+    <a href="card.html">My Card</a>
+  </nav>
+  <div>Central Pacific Ski Club · San Luis Obispo · <a href="https://cpsconline.com" style="color:#fff">cpsconline.com</a></div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+boot('public').catch(() => {});
+// Tap a flyer to see it big
+const lb = document.getElementById('lightbox');
+if (lb) {
+  const big = lb.querySelector('img');
+  document.querySelectorAll('.gallery button').forEach((b) => b.onclick = () => {
+    const i = b.querySelector('img'); big.src = i.src; big.alt = i.alt; lb.hidden = false; lb.focus();
+  });
+  lb.onclick = () => { lb.hidden = true; };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.hidden = true; });
+}
+// Events that already happened switch to "past"
+document.querySelectorAll('[data-ends]').forEach((el) => {
+  if (Date.now() > Date.parse(el.dataset.ends)) el.classList.add('is-past');
+});
+</script>
+</body></html>

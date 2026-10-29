@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ecffb0"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Questrial&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>About · Central Pacific Ski Club</title></head>
+<body>
+
+<main class="club">
+
+<section class="club-hero" style="background-image:url(img/site/group-snow-2.webp)">
+  <div class="wrap">
+    <div class="kicker">About</div>
+    <h1>What is <em>CPSC?</em></h1>
+    <p>Founded in 1941 — now the second-largest collegiate ski club in the nation.</p>
+  </div>
+</section>
+<div class="band" aria-hidden="true"><div><span>Live to ski, love to party</span><span>Est. 1941</span><span>San Luis Obispo</span><span>All levels welcome</span><span>Big Trip 2027 · Copper, CO</span><span>See you on the slopes (or the boat)</span><span>Live to ski, love to party</span><span>Est. 1941</span><span>San Luis Obispo</span><span>All levels welcome</span><span>Big Trip 2027 · Copper, CO</span><span>See you on the slopes (or the boat)</span></div></div>
+<section class="sec"><div class="wrap split">
+  <div class="prose">
+    <div class="kicker">Since 1941</div>
+    <h2 class="big">Chasing powder &amp; a ridiculously good time</h2>
+    <p>Founded in 1941, the Central Pacific Ski Club (CPSC) has grown into the second-largest collegiate ski club in the nation! CPSC brings together over a thousand snow lovers who are all about chasing powder and having a ridiculously good time, on and off the mountain. Whether you’re here to send it on the slopes or attend the best parties, you’ll find your people with us.</p>
+    <p>Every year, we hit the road for 7–8 trips to some of the best mountains in the country — think Tahoe, Utah, Colorado, and more. Whether you’re all about first chair on a powder day or just in it for the après, there’s a spot for you on all our trips.</p>
+  </div>
+  <img src="img/site/group-snow.webp" alt="CPSC members together on the mountain" width="1536" height="1024" class="rounded" loading="lazy" decoding="async">
+</div></section>
+<section class="sec lime tight"><div class="wrap">
+  <div class="stats">
+    <div><b>1941</b><span>Founded</span></div>
+    <div><b>1,000+</b><span>Members</span></div>
+    <div><b>7–8</b><span>Trips a year</span></div>
+    <div><b>10</b><span>Exec board members</span></div>
+  </div>
+</div></section>
+<section class="sec dark"><div class="wrap">
+  <div class="cards">
+    <div class="card season"><div class="num">01</div><div class="tag">Our members</div><h3>Who are we?</h3>
+      <p>The heart and soul of our club are our members. No other club in the area has such a diverse membership base composed of so many amazing people with different backgrounds and unique talents. Ski Club has a legendary event calendar, and between fall parties, our annual BIG TRIP, small trip season, spring dayges, spring skiing and houseboating, we have something for everyone! No reason to be board when you can join Central Pacific Ski Club!</p></div>
+    <div class="card season"><div class="num">02</div><div class="tag">Everyone</div><h3>Who can join?</h3>
+      <p>Everyone! Seriously. CPSC welcomes all skill levels, from first-timers to seasoned pros, and even those who just want to come along for the good times, killer events, and community. The best part about CPSC is the diversity of our members. We accept anyone and everyone with an interest in snow sports regardless of skill level, or even interest in snow sports for that matter. We can’t wait to meet you!</p></div>
+  </div>
+  <div class="btn-row" style="justify-content:center;margin-top:32px"><a class="btn lime lg" href="join.html">Join now</a></div>
+</div></section>
+<section class="sec tight"><div class="wrap"><div class="cta-band">
+  <div><h2>Already a <em>member?</em></h2><p>Your digital membership card lives in Apple Wallet or Google Wallet.</p></div>
+  <div class="btn-row" style="margin:0"><a class="btn lime lg" href="card.html">My card</a><a class="btn ghost lg" style="color:#fff;border-color:#fff" href="join.html">Join CPSC</a></div>
+</div></div></section>
+
+</main>
+<footer class="site-footer">
+  <img src="img/logo-white.png" alt="CPSC">
+  <div class="tag">Live to ski, love to party</div>
+  <nav class="links" aria-label="Central Pacific Ski Club">
+    <a href="about.html">About</a>
+    <a href="events.html">Events</a>
+    <a href="big-trip.html">Big Trip 2027</a>
+    <a href="ikon.html">Ikon Pass</a>
+    <a href="sponsors.html">Sponsors</a>
+    <a href="join.html">Join</a>
+    <a href="card.html">My Card</a>
+  </nav>
+  <div>Central Pacific Ski Club · San Luis Obispo · <a href="https://cpsconline.com" style="color:#fff">cpsconline.com</a></div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+boot('public').catch(() => {});
+// Tap a flyer to see it big
+const lb = document.getElementById('lightbox');
+if (lb) {
+  const big = lb.querySelector('img');
+  document.querySelectorAll('.gallery button').forEach((b) => b.onclick = () => {
+    const i = b.querySelector('img'); big.src = i.src; big.alt = i.alt; lb.hidden = false; lb.focus();
+  });
+  lb.onclick = () => { lb.hidden = true; };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.hidden = true; });
+}
+// Events that already happened switch to "past"
+document.querySelectorAll('[data-ends]').forEach((el) => {
+  if (Date.now() > Date.parse(el.dataset.ends)) el.classList.add('is-past');
+});
+</script>
+</body></html>

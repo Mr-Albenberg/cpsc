@@ -14,7 +14,8 @@ Digital membership cards for Central Pacific Ski Club. Members sign up (approved
 | `signup.html` | approved emails | Create account with name, email, password, photo |
 | `card.html` | members | Card with QR + Add to Apple / Google Wallet |
 | `admin.html` | admins | Approve emails (bulk paste), see members and last scan, make/remove admins, remove accounts |
-| `scan.html` | admins | Phone camera scanner — photo, name, last scanned (and by whom), total check-ins |
+| `scan.html` | admins | Phone camera scanner — a full-screen green / amber / red result that stays until tapped, then scanning resumes. **Info** opens the member's profile (photo, #, email, since, last scan, check-ins) and keeps it up until closed |
+| `home.html`, `about.html`, `events.html`, `big-trip.html`, `ikon.html`, `sponsors.html`, `join.html` | everyone | Club pages with the content from cpsconline.com, restyled. Images live in `img/site/` |
 
 ## Setup (about 15 minutes, all in the browser)
 
