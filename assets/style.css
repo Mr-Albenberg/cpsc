@@ -478,7 +478,7 @@ main.club img { height: auto; }
 .exec-photos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .exec-photos button { all: unset; cursor: zoom-in; border-radius: 12px; overflow: hidden; aspect-ratio: 9 / 16; box-shadow: var(--shadow); background: #ddd; }
 .exec-photos button:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
-.exec-photos img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+main.club .exec-photos img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
 .exec-photos button:hover img { transform: scale(1.05); }
 .exec-photos .ph { aspect-ratio: 9 / 16; border-radius: 12px; background: var(--lime); display: grid; place-items: center; font: 400 3rem/1 "Bebas Neue", sans-serif; }
 .exec-text h2 { font-size: clamp(2.4rem, 6vw, 3.6rem); margin: 0 0 12px; line-height: .95; }
