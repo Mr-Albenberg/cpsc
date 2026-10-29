@@ -21,9 +21,9 @@ const SERVICE_KEY = env('SUPABASE_SERVICE_ROLE_KEY') || (() => {
 const SITE_URL = env('SITE_URL').replace(/\/$/, ''); // e.g. https://mr-albenberg.github.io/cpsc
 const ORG = env('ORG_NAME') || 'Central Pacific Ski Club';
 const SHORT = env('ORG_SHORT') || 'CPSC';
-const BG = env('PASS_BG') || '#ECFFB0';
-const FG = env('PASS_FG') || '#000000';
-const LABEL = env('PASS_LABEL') || '#4A5A12';
+const BG = env('PASS_BG') || '#121212';
+const FG = env('PASS_FG') || '#FFFFFF';   // the poster draws text in this color, over dark artwork
+const LABEL = env('PASS_LABEL') || '#ECFFB0'; // club lime
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
@@ -348,10 +348,7 @@ export async function buildApplePass(p: Profile, thumb: Buffer | null, code: str
       primaryFields: [{ key: 'name', label: 'LIVE TO SKI, LOVE TO PARTY', value: p.name }],
       footerFields: voided
         ? [{ key: 'status', value: 'Membership ended' }]
-        : [
-            { key: 'no', value: [no, p.is_admin ? 'Exec Board' : 'Member'].filter(Boolean).join(' · ') },
-            { key: 'season', value: `${season()} season` },
-          ],
+        : [{ key: 'info', value: [no, p.is_admin ? 'Exec Board' : 'Member', season()].filter(Boolean).join(' · ') }],
     },
     barcodes: [{ format: 'PKBarcodeFormatQR', message: QR(voided ? 'void' : p.serial), messageEncoding: 'iso-8859-1', altText: ORG }],
   };
@@ -360,8 +357,9 @@ export async function buildApplePass(p: Profile, thumb: Buffer | null, code: str
   const files: Record<string, Buffer> = {
     'pass.json': Buffer.from(JSON.stringify(passJson)),
     'icon.png': icon, 'icon@2x.png': icon, 'icon@3x.png': icon,
-    'logo.png': await siteImage('pass-logo.png'),          // the CPSC mountain logo from cpsconline.com
-    'logo@2x.png': await siteImage('pass-logo@2x.png'),
+    'logo.png': await siteImage('pass/primaryLogo.png'),   // the CPSC mountain logo from cpsconline.com, in lime
+    'logo@2x.png': await siteImage('pass/primaryLogo@2x.png'),
+    'logo@3x.png': await siteImage('pass/primaryLogo@3x.png'),
   };
   // Poster artwork + lime logo (Apple's docs name the poster image both ways, so include both)
   for (const base of ['background', 'artwork', 'primaryLogo']) {
@@ -386,6 +384,8 @@ async function settingsInfo() {
   return { code: titleCase(data?.week_word || 'POWDER'), updatedMs: data ? Date.parse(data.updated_at) : 0 };
 }
 const ms = (t?: string | null) => (t ? Date.parse(t) : 0);
+// Bump this (to the current time) whenever the pass design changes; phones then fetch the new look.
+const DESIGN_AT = Date.parse('2026-10-29T20:18:00Z');
 
 // The pass for a serial, as of now (null if it never existed)
 async function applePassBySerial(serial: string): Promise<{ buf: Buffer; modified: number } | null> {
@@ -393,7 +393,7 @@ async function applePassBySerial(serial: string): Promise<{ buf: Buffer; modifie
   const { data: p } = await db.from('profiles').select(PROFILE_COLS).eq('serial', serial).maybeSingle();
   if (p) {
     const s = await settingsInfo();
-    return { buf: await buildApplePass(p as Profile, await thumbBuffer(p.id), p.pass_test_code || s.code), modified: Math.max(ms(p.pass_updated_at), s.updatedMs) };
+    return { buf: await buildApplePass(p as Profile, await thumbBuffer(p.id), p.pass_test_code || s.code), modified: Math.max(ms(p.pass_updated_at), s.updatedMs, DESIGN_AT) };
   }
   const { data: v } = await db.from('voided_passes').select('*').eq('serial', serial).maybeSingle();
   if (v) {
@@ -446,7 +446,7 @@ async function appleWebService(req: Request, url: URL): Promise<Response | null>
     const { data: profs } = valid.length ? await db.from('profiles').select('serial,pass_updated_at').in('serial', valid) : { data: [] };
     const { data: voids } = await db.from('voided_passes').select('serial,voided_at').in('serial', serials);
     const mod: Record<string, number> = {};
-    for (const p of profs || []) mod[p.serial] = Math.max(ms(p.pass_updated_at), s.updatedMs);
+    for (const p of profs || []) mod[p.serial] = Math.max(ms(p.pass_updated_at), s.updatedMs, DESIGN_AT);
     for (const v of voids || []) mod[v.serial] = ms(v.voided_at);
     const changed = Object.keys(mod).filter((k) => mod[k] > since);
     if (!changed.length) return empty(204);
