@@ -10,14 +10,16 @@
   <div class="panel" style="padding:14px">
     <div id="reader"></div>
     <div class="center" style="margin-top:12px"><button class="btn" id="start" type="button">Start camera</button></div>
+    <details class="manual"><summary>No camera? Upload a photo of the QR code</summary>
+      <input type="file" id="qrfile" accept="image/*"></details>
   </div>
   <div class="result" id="result">
     <div class="status" id="status"></div>
+    <div class="status-sub" id="statusSub"></div>
     <img id="rphoto" alt="">
     <div class="name" id="rname"></div>
     <div class="rnum" id="rnum"></div>
-    <div class="last" id="rlast"></div>
-    <p class="muted" id="rmeta"></p>
+    <dl class="profile" id="rprofile"></dl>
     <div class="code-check" id="rcode"></div>
     <button class="btn dark" id="next" type="button">Scan next</button>
   </div>
@@ -51,12 +53,17 @@ boot('admin').then(() => {
     try { const c = new AudioContext(), o = c.createOscillator(); o.frequency.value = ok ? 880 : 220; o.connect(c.destination); o.start(); o.stop(c.currentTime + 0.15); } catch {}
     navigator.vibrate?.(ok ? 80 : [60, 40, 60]);
   };
+  const row = (k, v) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
+  function show(state, title, sub) {
+    $('#result').className = 'result show ' + state;
+    $('#status').textContent = title;
+    $('#statusSub').textContent = sub || '';
+  }
   function bad(text) {
-    $('#result').className = 'result show bad';
-    $('#status').textContent = '✕ Not valid';
+    show('bad', '✕ Not valid', text);
     $('#rphoto').style.display = 'none';
-    $('#rname').textContent = 'Not recognized'; $('#rnum').textContent = '';
-    $('#rlast').textContent = text; $('#rmeta').textContent = ''; $('#rcode').innerHTML = '';
+    $('#rname').textContent = ''; $('#rnum').textContent = '';
+    $('#rprofile').innerHTML = ''; $('#rcode').innerHTML = '';
     beep(false);
   }
   async function onScan(code) {
@@ -66,17 +73,21 @@ boot('admin').then(() => {
     if (error) bad(error.message);
     else if (!r.valid) bad(r.error);
     else {
-      $('#result').className = 'result show';
-      $('#status').textContent = '✓ Valid member';
-      $('#rname').textContent = r.member.name;
-      $('#rnum').textContent = [r.member.memberNo ? '#' + String(r.member.memberNo).padStart(4, '0') : '', r.member.isAdmin ? 'Exec board' : ''].filter(Boolean).join(' · ');
-      $('#rlast').innerHTML = 'Last scanned<strong>' + esc(r.lastScan ? fmtTime(r.lastScan) : 'First scan — welcome!') + '</strong>';
-      $('#rmeta').textContent = (r.lastScannedBy ? 'by ' + r.lastScannedBy + ' · ' : '') + r.totalScans + ' total check-in' + (r.totalScans === 1 ? '' : 's');
+      const m = r.member;
+      if (r.scannedWithin24h) show('warn', '! Already checked in today', 'Valid member, but this card was scanned ' + fmtTime(r.lastScan).split(' · ')[1] + (r.lastScannedBy ? ' by ' + r.lastScannedBy : '') + '.');
+      else show('', '✓ Valid member', r.lastScan ? 'First check-in today.' : 'First check-in ever — welcome!');
+      $('#rname').textContent = m.name;
+      $('#rnum').textContent = [m.memberNo ? '#' + String(m.memberNo).padStart(4, '0') : '', m.isAdmin ? 'Exec board' : 'Member'].filter(Boolean).join(' · ');
+      $('#rprofile').innerHTML =
+        row('Email', m.email) +
+        row('Member since', m.since ? new Date(m.since).toLocaleDateString([], { month: 'short', year: 'numeric' }) : '—') +
+        row('Last scanned', r.lastScan ? fmtTime(r.lastScan) : 'Never') +
+        row('Check-ins', r.totalScans + ' total' + (r.scansLast24h ? ` · ${r.scansLast24h + 1} in the last 24 h` : ''));
       $('#rcode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> in the top corner and match this photo.' : '';
-      const url = await signedPhoto(r.member.id);
+      const url = await signedPhoto(m.id);
       $('#rphoto').style.display = url ? '' : 'none';
       if (url) $('#rphoto').src = url;
-      beep(true);
+      beep(!r.scannedWithin24h);
     }
     $('#result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     clearTimeout(timer); timer = setTimeout(next, 10000);
@@ -87,6 +98,12 @@ boot('admin').then(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   $('#next').onclick = next;
+  $('#qrfile').onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try { const text = await scanner.scanFile(f, false); busy = false; onScan(text); }
+    catch { busy = false; bad("Couldn't find a QR code in that picture."); }
+    e.target.value = '';
+  };
   $('#start').onclick = async () => {
     try {
       await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } }, onScan);

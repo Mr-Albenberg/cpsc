@@ -6,7 +6,7 @@
 <div class="hero-photo" role="img" aria-label="Welcome to Central Pacific Ski Club"></div><section class="hero"><div class="eyebrow">Live to ski, love to party</div><h1>Member Login</h1><p>Your CPSC membership card, right in your phone's wallet.</p></section>
 <main class="narrow">
 <form class="panel" id="f">
-  <label for="email">Email</label><input type="email" id="email" autocomplete="email" required>
+  <label for="email">Email or username</label><input type="text" id="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
   <label for="password">Password</label><input type="password" id="password" autocomplete="current-password" required>
   <button class="btn block" type="submit" id="go">Log in</button>
   <div class="msg" id="msg"></div>
@@ -35,10 +35,12 @@ boot('guest').then(() => {
   if (new URLSearchParams(location.search).has('gone')) showMsg($('#msg'), 'That account has been removed. Ask an exec board member if this is a mistake.');
   $('#f').onsubmit = async (e) => {
     e.preventDefault(); $('#go').disabled = true;
-    const { error } = await sb.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#password').value });
+    const id = $('#email').value.trim();
+    const email = id.includes('@') ? id : id.toLowerCase() + '@example.com';   // demo usernames (admin, member1…)
+    const { error } = await sb.auth.signInWithPassword({ email, password: $('#password').value });
     if (error) {
       $('#go').disabled = false;
-      return showMsg($('#msg'), /confirm/i.test(error.message) ? 'Confirm your email first — check your inbox for the link.' : 'Wrong email or password.');
+      return showMsg($('#msg'), /confirm/i.test(error.message) ? 'Confirm your email first — check your inbox for the link.' : 'Wrong email/username or password.');
     }
     location.href = 'card.html';
   };

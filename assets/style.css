@@ -241,3 +241,17 @@ footer.site-footer { background: var(--dark); color: #cfcfcf; text-align: center
 .code-chip b { color: var(--lime); font-family: "Bebas Neue", sans-serif; font-size: 1.35rem; font-weight: 400; letter-spacing: .04em; vertical-align: -2px; }
 .code-check { background: var(--lime); border-radius: 8px; padding: 10px 12px; margin: 4px 0 14px; font-size: .95rem; }
 .code-check:empty { display: none; }
+
+/* ===== Scanner: three states + profile ===== */
+.result.warn { border-top-color: #f2a516; }
+.result.warn .status { color: #b26b00; }
+.result .status-sub { font-size: .95rem; color: var(--muted); margin: 2px 0 12px; }
+.result .status-sub:empty { display: none; }
+.result.warn img { border-color: #ffd27a; }
+.profile { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; text-align: left; margin: 14px 0; padding: 14px; background: var(--snow); border-radius: 10px; }
+.profile:empty { display: none; }
+.profile dt { font-family: "Bebas Neue", sans-serif; letter-spacing: .06em; color: var(--muted); font-size: 1rem; }
+.profile dd { margin: 0; font-size: .92rem; word-break: break-word; }
+.manual { margin-top: 12px; font-size: .9rem; text-align: center; }
+.manual summary { cursor: pointer; color: var(--muted); }
+.manual input { margin-top: 8px; }
