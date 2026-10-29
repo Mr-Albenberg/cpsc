@@ -230,3 +230,8 @@ footer { text-align: center; color: var(--muted); font-size: .75rem; padding: 20
 .test-box { margin-top: 18px; padding: 14px; border: 1.5px dashed var(--line); border-radius: 14px; }
 .test-box p { margin: 6px 0 10px; }
 .test-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ===== Member number ===== */
+.member-card .who .memno { font-size: .66rem; letter-spacing: .14em; color: #9fb6cc; font-weight: 700; margin-top: 3px; }
+.result .rnum { font-family: Montserrat, sans-serif; font-weight: 800; letter-spacing: .12em; color: var(--muted); font-size: .85rem; margin-bottom: 6px; }
+.result .rnum:empty { display: none; }

@@ -10,7 +10,7 @@
     <div class="notice" id="needPhoto" style="display:none"><strong>Add your photo to finish your card</strong>Admins see it when they scan you in. Use "Choose photo" on this page.</div>
     <div class="member-card">
       <div class="top"><span>CPSC</span><small>MEMBERSHIP CARD</small></div>
-      <div class="who"><img id="photo" alt=""><div><div class="label">MEMBER</div><div class="name" id="name"></div></div></div>
+      <div class="who"><img id="photo" alt=""><div><div class="label" id="role">MEMBER</div><div class="name" id="name"></div><div class="memno" id="memno"></div></div></div>
       <div class="qr"><div id="qr"></div></div>
       <div class="live-strip" id="live">
         <div class="live-row"><span class="live-dot"></span><span>LIVE</span><span class="live-clock" id="liveClock">--:--:--</span></div>
@@ -136,6 +136,8 @@ boot('member').then(async (ctx) => {
   $('#hi').textContent = 'Hey, ' + p.name.split(' ')[0];
   $('#name').textContent = p.name;
   $('#email').textContent = p.email;
+  $('#role').textContent = p.is_admin ? 'EXEC BOARD' : 'SKI CLUB MEMBER';
+  if (p.member_no) $('#memno').textContent = 'MEMBER #' + String(p.member_no).padStart(4, '0') + ' · SINCE ' + new Date(p.created_at).getFullYear();
   new QRCode($('#qr'), { text: 'CPSC1:' + p.serial, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
   loadPhoto();
 

@@ -64,32 +64,45 @@ function season() {
   return `${y}–${String(y + 1).slice(2)}`;
 }
 
+const memberNo = (p: Profile) => (p.member_no ? '#' + String(p.member_no).padStart(4, '0') : '');
+const CLUB = 'https://cpsconline.com';
+
+// Bump LAYOUT when the pass design changes so existing passes get the new look on their next update.
+const LAYOUT = 'L3';
+export const sigOf = (p: Profile, code: string) => [LAYOUT, p.name, memberNo(p), p.is_admin ? 'exec' : 'member', code].join('|');
+
 export function wwBody(p: Profile, code: string, thumbUri?: string) {
   const portal = (SITE_URL || 'https://mr-albenberg.github.io/cpsc') + '/card.html';
+  const no = memberNo(p);
+  const since = String(new Date(p.created_at).getFullYear());
   return {
-    logoText: `${SHORT} ❄`,
+    logoText: `${SHORT} ❄ SLO`,
     organizationName: ORG,
-    description: `${ORG} Membership Card`,
+    description: `${ORG} — ${p.name}'s membership card`,
     colorPreset: env('WALLETWALLET_COLOR') || 'blue',
     colorPro: BG,                 // paid plan only (ignored on free)
     thumbnailURLPro: thumbUri,    // paid plan only (ignored on free)
     headerFields: [{ label: 'THIS WEEK', value: code }],
-    primaryFields: [{ label: 'MEMBER', value: p.name }],
+    primaryFields: [{ label: p.is_admin ? 'EXEC BOARD' : 'SKI CLUB MEMBER', value: p.name }],
     secondaryFields: [
-      { label: 'STATUS', value: 'Active ✓' },
+      ...(no ? [{ label: 'MEMBER', value: no }] : []),
       { label: 'SEASON', value: season() },
-      { label: 'SINCE', value: String(new Date(p.created_at).getFullYear()) },
+      { label: 'SINCE', value: since },
     ],
     backFields: [
-      { label: 'Check-in code', value: `This week's code is ${code}. It changes regularly and updates on its own — a card without the current code isn't valid.` },
-      { label: 'Live to ski, love to party', value: `Show this card at ${SHORT} events, trips and sponsor discounts.` },
-      { label: 'Member', value: `${p.name} · ${p.email}` },
-      { label: 'Member portal', value: portal },
-      { label: 'Club site', value: 'https://cpsconline.com' },
+      { label: '🔐 Check-in code', value: `This week's code is ${code}. It changes regularly and updates on its own — a card without the current code isn't valid. Door staff also scan your QR to see your photo.` },
+      { label: '🏔️ Central Pacific Ski Club', value: 'Live to ski, love to party. San Luis Obispo\'s ski & snowboard club — all levels welcome. Big Trip every winter break, weekend trips all season, weekly events year-round.' },
+      { label: '👤 Member', value: [p.name, no, `member since ${since}`].filter(Boolean).join(' · ') },
+      { label: '🪪 Your card & photo', value: portal },
+      { label: '🎿 Trips & events', value: `${CLUB}/small-trip-info-page/` },
+      { label: '✈️ Big Trip 2027', value: `${CLUB}/big-trip-2027/` },
+      { label: '💸 Member discounts', value: `${CLUB}/membership-discounts/` },
+      { label: '🧑‍🤝‍🧑 Exec board', value: `${CLUB}/exec-board-26-27/` },
+      { label: '🌐 cpsconline.com', value: CLUB },
     ],
     barcodeValue: QR(p.serial),
     barcodeFormat: 'QR',
-    barcodeAltText: p.name.slice(0, 128),
+    barcodeAltText: [no, p.name].filter(Boolean).join(' · ').slice(0, 128),
   };
 }
 
@@ -162,7 +175,7 @@ async function refreshPkpass(id: string, c: Partial<WWCache>) {
 // Make sure this member has an up-to-date pass. Creates it on first use, updates it if stale.
 export async function wwPassFor(p: Profile): Promise<WWCache> {
   const code = (await currentCode()).text;
-  const sig = `${p.name}|${code}`;
+  const sig = sigOf(p, code);
   const cache = await readCache(p.id);
   const serial = p.wallet_serial || cache?.serial;
 
@@ -212,7 +225,7 @@ export async function wwPassFor(p: Profile): Promise<WWCache> {
 // Push the current code to every member's pass (admin "Update all passes" button).
 export async function wwRefreshAll() {
   const code = (await currentCode()).text;
-  const { data: members } = await db.from('profiles').select('id,email,name,serial,created_at,wallet_serial').not('wallet_serial', 'is', null);
+  const { data: members } = await db.from('profiles').select('id,email,name,serial,created_at,wallet_serial,member_no,is_admin').not('wallet_serial', 'is', null);
   const list = (members || []) as Profile[];
   let updated = 0, phones = 0, failed = 0, gone = 0;
   let quotaHit = false;
@@ -226,7 +239,7 @@ export async function wwRefreshAll() {
         updated++; phones += n;
         const cache = await readCache(p.id);
         if (cache?.serial === p.wallet_serial && cache.googleSaveUrl) {
-          await writeCache(p.id, { ...(cache as WWCache), v: 3, sig: `${p.name}|${code}` });
+          await writeCache(p.id, { ...(cache as WWCache), v: 3, sig: sigOf(p, code) });
           await refreshPkpass(p.id, cache);
         }
       } catch (e) {
@@ -278,7 +291,7 @@ async function logo() {
   return logoCache;
 }
 
-type Profile = { id: string; email: string; name: string; serial: string; created_at: string; wallet_serial?: string | null };
+type Profile = { id: string; email: string; name: string; serial: string; created_at: string; wallet_serial?: string | null; member_no?: number | null; is_admin?: boolean };
 
 export async function buildApplePass(p: Profile, thumb: Buffer | null, logoPng: Buffer) {
   const files: Record<string, Buffer> = {
@@ -358,7 +371,7 @@ export async function googleSaveUrl(p: Profile, photoUrl: string | null) {
 
 // ---------- HTTP ----------
 async function profileFor(id: string) {
-  const { data } = await db.from('profiles').select('id,email,name,serial,created_at,wallet_serial').eq('id', id).maybeSingle();
+  const { data } = await db.from('profiles').select('id,email,name,serial,created_at,wallet_serial,member_no,is_admin').eq('id', id).maybeSingle();
   return data as Profile | null;
 }
 
@@ -434,7 +447,7 @@ export async function handler(req: Request): Promise<Response> {
         const phones = await wwUpdate(serial, wwBody(p, testCode, await thumbFor(p.id)));
         if (phones === null) return json({ error: 'That pass no longer exists. Tap Add to Wallet on your card page to get a fresh one.' }, 410);
         await track(p.id, serial);
-        await writeCache(p.id, { ...(cache as WWCache), serial, sig: `${p.name}|${testCode}` }); // next add/restore re-syncs
+        await writeCache(p.id, { ...(cache as WWCache), serial, sig: sigOf(p, testCode) }); // next add/restore re-syncs
         await refreshPkpass(p.id, { ...cache, serial });
         return json({ code: testCode, phones });
       }

@@ -92,7 +92,7 @@ Database: run [`supabase/migrations/002_weekly_code.sql`](supabase/migrations/00
 
 **Testing live updates.** On `admin.html`, *Test on your phone* sends a test word (e.g. 🧪 TEST 5:04 PM) to your own pass only — watch it change in Wallet without re-adding — then *Put the real code back*. Each press uses one WalletWallet update.
 
-Database: also run [`supabase/migrations/003_wallet_pass_history.sql`](supabase/migrations/003_wallet_pass_history.sql) (already done for the live project).
+Database: also run [`supabase/migrations/003_wallet_pass_history.sql`](supabase/migrations/003_wallet_pass_history.sql) and [`004_member_numbers.sql`](supabase/migrations/004_member_numbers.sql) (already done for the live project).
 
 ## Branding
 - Replace `img/logo.png` with the club logo (square PNG, ~512px). It's used in the header and on both wallet passes.

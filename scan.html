@@ -15,6 +15,7 @@
     <div class="status" id="status"></div>
     <img id="rphoto" alt="">
     <div class="name" id="rname"></div>
+    <div class="rnum" id="rnum"></div>
     <div class="last" id="rlast"></div>
     <p class="muted" id="rmeta"></p>
     <div class="code-check" id="rcode"></div>
@@ -42,7 +43,7 @@ boot('admin').then(() => {
     $('#result').className = 'result show bad';
     $('#status').textContent = '✕ Not valid';
     $('#rphoto').style.display = 'none';
-    $('#rname').textContent = 'Not recognized';
+    $('#rname').textContent = 'Not recognized'; $('#rnum').textContent = '';
     $('#rlast').textContent = text; $('#rmeta').textContent = ''; $('#rcode').innerHTML = '';
     beep(false);
   }
@@ -56,6 +57,7 @@ boot('admin').then(() => {
       $('#result').className = 'result show';
       $('#status').textContent = '✓ Valid member';
       $('#rname').textContent = r.member.name;
+      $('#rnum').textContent = [r.member.memberNo ? '#' + String(r.member.memberNo).padStart(4, '0') : '', r.member.isAdmin ? 'Exec board' : ''].filter(Boolean).join(' · ');
       $('#rlast').innerHTML = 'Last scanned<strong>' + esc(r.lastScan ? fmtTime(r.lastScan) : 'First scan — welcome!') + '</strong>';
       $('#rmeta').textContent = (r.lastScannedBy ? 'by ' + r.lastScannedBy + ' · ' : '') + r.totalScans + ' total check-in' + (r.totalScans === 1 ? '' : 's');
       $('#rcode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> and match this photo.' : '';
