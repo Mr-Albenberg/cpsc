@@ -299,9 +299,19 @@ const pem = (k: string) => secret(k)?.toString('utf8') ?? '';
 const b64url = (u: Uint8Array) => btoa(String.fromCharCode(...u)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
-// Per-pass secret the phone sends back ("ApplePass <token>"). Derived from the signing key, so nothing to store.
+// Per-pass secret the phone sends back ("ApplePass <token>"). Derived from a long-lived secret in the
+// database (not the signing key), so renewing the certificate never breaks existing passes.
+let passSecret: Uint8Array | null = null;
+async function passSecretBytes() {
+  if (!passSecret) {
+    const { data } = await db.from('pass_secrets').select('secret').eq('id', 1).maybeSingle();
+    if (!data?.secret) throw new Error('pass_secrets is missing — run supabase/migrations/006_pass_auth_secret.sql');
+    passSecret = new TextEncoder().encode(data.secret);
+  }
+  return passSecret;
+}
 export async function passAuthToken(serial: string) {
-  const key = await crypto.subtle.importKey('raw', secret('APPLE_SIGNER_KEY')!, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const key = await crypto.subtle.importKey('raw', await passSecretBytes(), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return b64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode('pass-auth:' + serial)))).slice(0, 40);
 }
 
