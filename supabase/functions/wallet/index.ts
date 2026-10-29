@@ -20,9 +20,9 @@ const SERVICE_KEY = env('SUPABASE_SERVICE_ROLE_KEY') || (() => {
 const SITE_URL = env('SITE_URL').replace(/\/$/, ''); // e.g. https://mr-albenberg.github.io/cpsc
 const ORG = env('ORG_NAME') || 'Central Pacific Ski Club';
 const SHORT = env('ORG_SHORT') || 'CPSC';
-const BG = env('PASS_BG') || '#121212';
-const FG = env('PASS_FG') || '#ffffff';
-const LABEL = env('PASS_LABEL') || '#ECFFB0';
+const BG = env('PASS_BG') || '#ECFFB0';
+const FG = env('PASS_FG') || '#000000';
+const LABEL = env('PASS_LABEL') || '#4A5A12';
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
@@ -80,10 +80,10 @@ export function wwBody(p: Profile, code: string, thumbUri?: string) {
     logoText: SHORT,
     organizationName: ORG,
     description: `${ORG} — ${p.name}'s membership card`,
-    // Free plan: closest preset to the club's black & white look. Paid plan: exact color + real logo.
+    // Free plan: closest preset (dark). Paid plan: the site's lime + the real CPSC logo.
     colorPreset: env('WALLETWALLET_COLOR') || 'dark',
     colorPro: BG,
-    logoURLPro: `${site}/img/logo-white.png`,
+    logoURLPro: `${site}/img/logo.png`,          // the black CPSC mountain logo, on lime
     iconURLPro: `${site}/img/icon.png`,
     thumbnailURLPro: thumbUri,
     headerFields: [{ value: code }],                       // the check-in word, top right, no label
@@ -274,15 +274,16 @@ async function readToken(token: string) {
 }
 
 // ---------- Apple ----------
-let logoCache: Buffer | null = null;
-async function logo() {
-  if (!logoCache) {
-    const r = await fetch(`${SITE_URL}/img/icon.png`);
-    if (!r.ok) throw new Error('Could not load img/icon.png from SITE_URL');
-    logoCache = Buffer.from(await r.arrayBuffer());
+const imgCache: Record<string, Buffer> = {};
+async function siteImage(name: string) {
+  if (!imgCache[name]) {
+    const r = await fetch(`${SITE_URL}/img/${name}`);
+    if (!r.ok) throw new Error(`Could not load img/${name} from SITE_URL`);
+    imgCache[name] = Buffer.from(await r.arrayBuffer());
   }
-  return logoCache;
+  return imgCache[name];
 }
+const logo = () => siteImage('icon.png');
 
 type Profile = { id: string; email: string; name: string; serial: string; created_at: string; wallet_serial?: string | null; member_no?: number | null; is_admin?: boolean };
 
@@ -314,8 +315,8 @@ export async function buildApplePass(p: Profile, thumb: Buffer | null, logoPng: 
     })),
     'icon.png': logoPng,
     'icon@2x.png': logoPng,
-    'logo.png': logoPng,
-    'logo@2x.png': logoPng,
+    'logo.png': await siteImage('pass-logo.png'),
+    'logo@2x.png': await siteImage('pass-logo@2x.png'),
   };
   if (thumb) { files['thumbnail.png'] = thumb; files['thumbnail@2x.png'] = thumb; }
   const pass = new PKPass(files, {
