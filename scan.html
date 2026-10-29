@@ -11,6 +11,7 @@
     <div id="reader"></div>
     <div class="center" style="margin-top:12px"><button class="btn" id="start" type="button">Start camera</button></div>
     <p class="hint center" id="ready" hidden>Ready — hold a pass in front of the camera.</p>
+    <div class="sound-test"><span>Gate sounds:</span><button class="btn ghost" type="button" id="sGood">▶ Valid</button><button class="btn ghost" type="button" id="sBad">▶ Rejected</button></div>
     <details class="manual"><summary>No camera? Upload a photo of the QR code</summary>
       <input type="file" id="qrfile" accept="image/*"></details>
   </div>
@@ -70,10 +71,48 @@ boot('admin').then(() => {
   let weekCode = null, busy = false, last = null;
   const loadCode = async () => { weekCode = await getWeekCode(); if (weekCode) $('#scanCode').innerHTML = 'Real cards show <b>' + esc(weekCode.text) + '</b> in the top corner'; };
   loadCode(); setInterval(loadCode, 60000);
-  const beep = (ok) => {
-    try { const c = new AudioContext(), o = c.createOscillator(); o.frequency.value = ok ? 880 : 220; o.connect(c.destination); o.start(); o.stop(c.currentTime + 0.15); } catch {}
-    navigator.vibrate?.(ok ? 80 : [60, 40, 60]);
+  // Ski-lift gate sounds (synthesized, no audio files): good = bright "bee-BEEP", bad = low double buzz
+  let actx = null;
+  const audio = () => {
+    if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
+    if (actx?.state === 'suspended') actx.resume();
+    return actx;
   };
+  // iPhone only allows sound after a tap, so unlock on the first touch/click
+  ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, function unlock() {
+    const c = audio(); if (c) { const s = c.createBufferSource(); s.buffer = c.createBuffer(1, 1, 22050); s.connect(c.destination); s.start(); }
+    document.removeEventListener(ev, unlock);
+  }, { once: true }));
+  function tone(c, t, freq, dur, type, vol, endFreq) {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (endFreq) o.frequency.linearRampToValueAtTime(endFreq, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.setValueAtTime(vol, t + dur - 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.__out); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function out(c) {
+    if (!c.__out) { // gentle lowpass + compressor so it sounds like a gate speaker, not a raw synth
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 5200;
+      const k = c.createDynamicsCompressor(); f.connect(k); k.connect(c.destination); c.__out = f;
+    }
+  }
+  const SOUNDS = {
+    good(c, t) { // two quick bright chirps, rising — the "go ahead" gate beep
+      tone(c, t, 2093, 0.085, 'square', 0.22); tone(c, t, 4186, 0.085, 'sine', 0.06);
+      tone(c, t + 0.115, 2794, 0.20, 'square', 0.22); tone(c, t + 0.115, 5588, 0.20, 'sine', 0.05);
+    },
+    bad(c, t) { // low, harsh double buzz — the "stop, see the window" reject
+      for (const s of [0, 0.26]) { tone(c, t + s, 240, 0.21, 'sawtooth', 0.32, 200); tone(c, t + s, 247, 0.21, 'square', 0.16, 205); }
+    },
+  };
+  const beep = (ok) => {
+    try { const c = audio(); if (c) { out(c); SOUNDS[ok ? 'good' : 'bad'](c, c.currentTime + 0.02); } } catch {}
+    navigator.vibrate?.(ok ? 90 : [180, 80, 180]);
+  };
+  window.testSound = beep;
   const row = (k, v) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
   const ICON = { ok: '✓', warn: '!', bad: '✕' };
 
@@ -152,7 +191,10 @@ boot('admin').then(() => {
     catch { busy = true; bad("Couldn't find a QR code in that picture."); }
     e.target.value = '';
   };
+  $('#sGood').onclick = () => beep(true);
+  $('#sBad').onclick = () => beep(false);
   $('#start').onclick = async () => {
+    audio();
     try {
       await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } }, onScan);
       $('#start').style.display = 'none'; $('#ready').hidden = false;
