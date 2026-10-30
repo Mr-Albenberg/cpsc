@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ecffb0"><meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Questrial&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>Log in · CPSC Membership</title></head>
+<body>
+<div class="hero-photo" role="img" aria-label="Welcome to Central Pacific Ski Club"></div><section class="hero"><div class="eyebrow">Live to ski, love to party</div><h1>Member Login</h1><p>Your CPSC membership card, right in your phone's wallet.</p></section>
+<main class="narrow">
+<form class="panel" id="f">
+  <label for="email">Email or username</label><input type="text" id="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+  <label for="password">Password</label><input type="password" id="password" autocomplete="current-password" required>
+  <button class="btn block" type="submit" id="go">Log in</button>
+  <div class="msg" id="msg"></div>
+  <p class="muted center" style="margin-top:18px"><button type="button" class="link-btn" id="forgot">Forgot password?</button></p>
+  <p class="muted center">New member? <a href="signup.html">Create your account</a></p>
+</form>
+</main>
+<footer class="site-footer">
+  <img src="img/logo-white.png" alt="CPSC">
+  <div class="tag">Live to ski, love to party</div>
+  <nav class="links" aria-label="Central Pacific Ski Club">
+    <a href="about.html">About</a>
+    <a href="events.html">Events</a>
+    <a href="big-trip.html">Big Trip 2027</a>
+    <a href="ikon.html">Ikon Pass</a>
+    <a href="sponsors.html">Sponsors</a>
+    <a href="exec-board.html">Exec Board</a>
+    <a href="join.html">Join</a>
+    <a href="card.html">My Card</a>
+  </nav>
+  <div>Central Pacific Ski Club · San Luis Obispo · <a href="https://cpsconline.com" style="color:#fff">cpsconline.com</a></div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/fx.js" defer></script>
+<script>
+boot('guest').then(() => {
+  if (new URLSearchParams(location.search).get('next') === 'exec-board.html') showMsg($('#msg'), 'The Exec Board page is for members — log in to see it.', 'ok');
+  if (new URLSearchParams(location.search).has('gone')) showMsg($('#msg'), 'That account has been removed. Ask an exec board member if this is a mistake.');
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault(); $('#go').disabled = true;
+    const id = $('#email').value.trim();
+    const email = id.includes('@') ? id : id.toLowerCase() + '@example.com';   // demo usernames (admin, member1…)
+    const { error } = await sb.auth.signInWithPassword({ email, password: $('#password').value });
+    if (error) {
+      $('#go').disabled = false;
+      return showMsg($('#msg'), /confirm/i.test(error.message) ? 'Confirm your email first — check your inbox for the link.' : 'Wrong email/username or password.');
+    }
+    location.href = nextPage();
+  };
+  $('#forgot').onclick = async () => {
+    const email = $('#email').value.trim();
+    if (!email) return showMsg($('#msg'), 'Type your email above first, then tap "Forgot password?" again.');
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: new URL('reset.html', location.href).href });
+    error ? showMsg($('#msg'), error.message) : showMsg($('#msg'), 'If that email has an account, a reset link is on its way.', true);
+  };
+}).catch(() => {});
+</script>
+</body></html>

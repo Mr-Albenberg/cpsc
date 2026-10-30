@@ -10,7 +10,8 @@ Digital membership cards for Central Pacific Ski Club. Members sign up (approved
 
 | Page | Who | What |
 |---|---|---|
-| `index.html` | everyone | Log in, forgot password |
+| `index.html` | everyone | Site root: the club Home page for visitors; logged-in members go straight to their card |
+| `login.html` | everyone | Log in, forgot password |
 | `signup.html` | approved emails | Create account with name, email, password, photo |
 | `card.html` | members | Card with QR + Add to Apple / Google Wallet |
 | `admin.html` | admins | Approve emails (bulk paste), see members and last scan, make/remove admins, remove accounts |

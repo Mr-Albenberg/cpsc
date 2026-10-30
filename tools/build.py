@@ -43,7 +43,7 @@ def hero(eyebrow, h1, p, h1_id='', photo=False):
     return banner + f'<section class="hero"><div class="eyebrow">{eyebrow}</div><h1{(" id="+chr(34)+h1_id+chr(34)) if h1_id else ""}>{h1}</h1><p>{p}</p></section>'
 
 # ---------- Login ----------
-page('index.html', 'Log in',
+page('login.html', 'Log in',
  hero('Live to ski, love to party', 'Member Login', "Your CPSC membership card, right in your phone's wallet.", photo=True),
  '''<form class="panel" id="f">
   <label for="email">Email or username</label><input type="text" id="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
@@ -90,7 +90,7 @@ page('signup.html', 'Create account',
   <label for="password">Password</label><input type="password" id="password" autocomplete="new-password" minlength="8" required>
   <button class="btn block" type="submit" id="go">Create account</button>
   <div class="msg" id="msg"></div>
-  <p class="muted center" style="margin-top:18px">Already have one? <a href="index.html">Log in</a></p>
+  <p class="muted center" style="margin-top:18px">Already have one? <a href="login.html">Log in</a></p>
 </form>''',
  r'''
 boot('guest').then(() => {

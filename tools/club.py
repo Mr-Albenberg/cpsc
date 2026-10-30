@@ -37,6 +37,11 @@ LIGHTBOX = '<div class="lightbox" id="lightbox" hidden tabindex="-1" role="dialo
 
 def club(fname, title, body, script=''):
     page(fname, title, '', body, CLUB_JS + script, main_class='club', suffix='Central Pacific Ski Club')
+    if fname == 'home.html':
+        # The site root: Home for visitors, straight to your card if you're logged in
+        page('index.html', title, ROOT_REDIRECT, body, CLUB_JS + script, main_class='club', suffix='Central Pacific Ski Club')
+
+ROOT_REDIRECT = '''<script>try { if (Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k) && localStorage.getItem(k))) location.replace('card.html'); } catch (e) {}</script>'''
 
 def band(words):
     seq = ''.join(f'<span>{w}</span>' for w in words)

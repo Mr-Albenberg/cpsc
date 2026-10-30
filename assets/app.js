@@ -7,14 +7,15 @@
   window.sb = configured ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
   window.FN_URL = configured ? CFG.supabaseUrl.replace(/\/$/, '') + '/functions/v1/wallet' : null;
 
-  const here = location.pathname.split('/').pop() || 'index.html';
+  const file = location.pathname.split('/').pop() || 'index.html';
+  const here = file === 'index.html' ? 'home.html' : file; // the site root is the Home page
 
   // Club pages (content from cpsconline.com) + account links for who's logged in
   const CLUB = [['home.html', 'Home'], ['about.html', 'About'], ['events.html', 'Events'], ['big-trip.html', 'Big Trip'],
     ['ikon.html', 'Ikon Pass'], ['sponsors.html', 'Sponsors'], ['exec-board.html', 'Exec Board'], ['join.html', 'Join']];
   function renderHeader(nav) {
     const acct = {
-      guest: [['index.html', 'Log in']],
+      guest: [['login.html', 'Log in']],
       member: [['card.html', 'My card']],
       admin: [['card.html', 'My card'], ['admin.html', 'Members'], ['scan.html', 'Scan']],
     }[nav] || [];
@@ -31,7 +32,7 @@
     const btn = header.querySelector('.menu-btn');
     btn.onclick = () => { const open = header.classList.toggle('open'); btn.setAttribute('aria-expanded', open); };
     const lo = document.getElementById('logout');
-    if (lo) lo.onclick = async () => { await sb.auth.signOut(); location.href = 'index.html'; };
+    if (lo) lo.onclick = async () => { await sb.auth.signOut(); location.href = 'home.html'; };
   }
 
   function showSetup() {
@@ -44,7 +45,7 @@
   // Where to go after logging in (?next=exec-board.html), only pages on this site
   window.nextPage = function () {
     const n = new URLSearchParams(location.search).get('next') || '';
-    return /^[a-z0-9-]+\.html$/.test(n) && n !== 'index.html' ? n : 'card.html';
+    return /^[a-z0-9-]+\.html$/.test(n) && !['index.html', 'login.html'].includes(n) ? n : 'card.html';
   };
 
   // need: 'guest' | 'member' | 'admin' | 'any' | 'public'
@@ -54,6 +55,7 @@
     const { data: { session } } = await sb.auth.getSession();
     if (need === 'any') return { session };
     if (need === 'public') { // club pages: open to everyone, header shows the right account links
+      if (session && file === 'index.html') { location.replace('card.html'); throw new Error('redirect'); } // site root → your card
       if (session) sb.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle()
         .then(({ data }) => data && renderHeader(data.is_admin ? 'admin' : 'member'));
       return { session };
@@ -62,11 +64,11 @@
       if (session) { location.replace(window.nextPage()); throw new Error('redirect'); }
       return {};
     }
-    if (!session) { location.replace('index.html?next=' + encodeURIComponent(here)); throw new Error('redirect'); }
+    if (!session) { location.replace('login.html?next=' + encodeURIComponent(file)); throw new Error('redirect'); }
     const { data: profile, error } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
     if (error || !profile) {
       await sb.auth.signOut();
-      location.replace('index.html?gone=1');
+      location.replace('login.html?gone=1');
       throw new Error('no profile');
     }
     if (need === 'admin' && !profile.is_admin) { location.replace('card.html'); throw new Error('redirect'); }

@@ -1,18 +1,53 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ecffb0"><meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Questrial&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>Log in · CPSC Membership</title></head>
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>Home · Central Pacific Ski Club</title></head>
 <body>
-<div class="hero-photo" role="img" aria-label="Welcome to Central Pacific Ski Club"></div><section class="hero"><div class="eyebrow">Live to ski, love to party</div><h1>Member Login</h1><p>Your CPSC membership card, right in your phone's wallet.</p></section>
-<main class="narrow">
-<form class="panel" id="f">
-  <label for="email">Email or username</label><input type="text" id="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-  <label for="password">Password</label><input type="password" id="password" autocomplete="current-password" required>
-  <button class="btn block" type="submit" id="go">Log in</button>
-  <div class="msg" id="msg"></div>
-  <p class="muted center" style="margin-top:18px"><button type="button" class="link-btn" id="forgot">Forgot password?</button></p>
-  <p class="muted center">New member? <a href="signup.html">Create your account</a></p>
-</form>
+<script>try { if (Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k) && localStorage.getItem(k))) location.replace('card.html'); } catch (e) {}</script>
+<main class="club">
+
+<section class="home-banner"><img src="img/site/home-hero.webp" alt="Welcome to Central Pacific Ski Club — members celebrating in the snow" width="2400" height="1600"></section>
+<section class="home-intro"><div class="wrap">
+  <h1>Live to ski, love to party</h1>
+  <p>Whether you’re sending cliffs or just learning to ski, we’re here to bring together everyone who shares a love for skiing, snowboarding, and having a good time.</p>
+  <div class="btn-row"><a class="btn lg" href="join.html">Become a member</a><a class="btn ghost lg" href="events.html">Events</a></div>
+</div></section>
+<div class="band" aria-hidden="true"><div><span>Live to ski, love to party</span><span>Est. 1941</span><span>San Luis Obispo</span><span>All levels welcome</span><span>Big Trip 2027 · Copper, CO</span><span>See you on the slopes (or the boat)</span><span>Live to ski, love to party</span><span>Est. 1941</span><span>San Luis Obispo</span><span>All levels welcome</span><span>Big Trip 2027 · Copper, CO</span><span>See you on the slopes (or the boat)</span></div></div>
+<section class="sec"><div class="wrap split">
+  <div class="prose">
+    <div class="kicker">Who we are</div>
+    <h2 class="big">Your people.<br>Powder days.</h2>
+    <p>We’re proud to be one of the largest social clubs in San Luis Obispo, where our goal is to build community through unforgettable trips, weekly events, and a shared passion for skiing and partying. CPSC is run by an executive board of 10 members, putting together the best events and membership experience.</p>
+    <p>Every winter break, we send a legendary week-long trip to some awesome resorts — past destinations include Jackson Hole, Steamboat, and Big Sky. During Winter (Spring Semester), we keep the stoke alive with smaller trips to places like Oregon, Tahoe, Mammoth, and Utah.</p>
+    <p>But the fun doesn’t stop when the snow melts. Spring means it’s time for our annual spring skiing trip and houseboating. As well as our awesome spring trips, we host weekly events throughout the year to keep everyone connected and excited about ski club. We take pride in being super inclusive — all levels are welcome, and we’re always welcoming and encouraging new members!</p>
+    <p><strong>If you’re looking for your people, powder days, and your best college memories, you’ve found the right place. See you on the slopes (or the boat)!</strong></p>
+    <div class="btn-row"><a class="btn" href="about.html">About us</a><a class="btn ghost" href="events.html">Events</a></div>
+  </div>
+  <img src="img/site/home-graphic.webp" alt="CPSC skier mid-air" width="1258" height="912" class="rounded" loading="lazy" decoding="async">
+</div></section>
+<section class="sec lime tight"><div class="wrap">
+  <div class="stats">
+    <div><b>1941</b><span>Founded</span></div>
+    <div><b>1,000+</b><span>Snow lovers</span></div>
+    <div><b>7–8</b><span>Trips every year</span></div>
+    <div><b>#2</b><span>Largest collegiate ski club in the nation</span></div>
+  </div>
+</div></section>
+<section class="sec"><div class="wrap">
+  <div class="kicker">Happening now</div>
+  <h2 class="big">What’s on</h2>
+  <div class="tiles">
+    <a class="tile" href="big-trip.html" style="background-image:url(img/site/copper.webp)"><small>Jan 18–23 · $799</small><strong>Big Trip 2027</strong><span>Copper, CO for Powdaze</span></a>
+    <a class="tile" href="ikon.html" style="background-image:url(img/site/group-snow-2.webp)"><small>2026/27 · On sale</small><strong>Ikon Pass</strong><span>Discounted through CPSC</span></a>
+    <a class="tile" href="events.html" style="background-image:url(img/site/beach.webp)"><small>Fall · Winter · Spring</small><strong>Events</strong><span>Parties, small trips, daygers & houseboating</span></a>
+    <a class="tile" href="sponsors.html" style="background-image:url(img/site/hostel-1.webp)"><small>2026–2027</small><strong>Sponsors</strong><span>The brands that keep us sending</span></a>
+  </div>
+</div></section>
+<section class="sec tight"><div class="wrap"><div class="cta-band">
+  <div><h2>Already a <em>member?</em></h2><p>Your digital membership card lives in Apple Wallet or Google Wallet.</p></div>
+  <div class="btn-row" style="margin:0"><a class="btn lime lg" href="card.html">My card</a><a class="btn ghost lg" style="color:#fff;border-color:#fff" href="join.html">Join CPSC</a></div>
+</div></div></section>
+
 </main>
 <footer class="site-footer">
   <img src="img/logo-white.png" alt="CPSC">
@@ -34,26 +69,20 @@
 <script src="assets/app.js"></script>
 <script src="assets/fx.js" defer></script>
 <script>
-boot('guest').then(() => {
-  if (new URLSearchParams(location.search).get('next') === 'exec-board.html') showMsg($('#msg'), 'The Exec Board page is for members — log in to see it.', 'ok');
-  if (new URLSearchParams(location.search).has('gone')) showMsg($('#msg'), 'That account has been removed. Ask an exec board member if this is a mistake.');
-  $('#f').onsubmit = async (e) => {
-    e.preventDefault(); $('#go').disabled = true;
-    const id = $('#email').value.trim();
-    const email = id.includes('@') ? id : id.toLowerCase() + '@example.com';   // demo usernames (admin, member1…)
-    const { error } = await sb.auth.signInWithPassword({ email, password: $('#password').value });
-    if (error) {
-      $('#go').disabled = false;
-      return showMsg($('#msg'), /confirm/i.test(error.message) ? 'Confirm your email first — check your inbox for the link.' : 'Wrong email/username or password.');
-    }
-    location.href = nextPage();
-  };
-  $('#forgot').onclick = async () => {
-    const email = $('#email').value.trim();
-    if (!email) return showMsg($('#msg'), 'Type your email above first, then tap "Forgot password?" again.');
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: new URL('reset.html', location.href).href });
-    error ? showMsg($('#msg'), error.message) : showMsg($('#msg'), 'If that email has an account, a reset link is on its way.', true);
-  };
-}).catch(() => {});
+boot('public').catch(() => {});
+// Tap a flyer to see it big
+const lb = document.getElementById('lightbox');
+if (lb) {
+  const big = lb.querySelector('img');
+  document.querySelectorAll('.gallery button').forEach((b) => b.onclick = () => {
+    const i = b.querySelector('img'); big.src = i.src; big.alt = i.alt; lb.hidden = false; lb.focus();
+  });
+  lb.onclick = () => { lb.hidden = true; };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.hidden = true; });
+}
+// Events that already happened switch to "past"
+document.querySelectorAll('[data-ends]').forEach((el) => {
+  if (Date.now() > Date.parse(el.dataset.ends)) el.classList.add('is-past');
+});
 </script>
 </body></html>
