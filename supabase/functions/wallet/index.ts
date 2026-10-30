@@ -41,7 +41,7 @@ const secret = (k: string) => {
 };
 export const appleReady = () =>
   !!(env('APPLE_PASS_TYPE_ID') && env('APPLE_TEAM_ID') && secret('APPLE_WWDR') && secret('APPLE_SIGNER_CERT') && secret('APPLE_SIGNER_KEY') && SITE_URL);
-export const googleReady = () => !!(env('GOOGLE_ISSUER_ID') && secret('GOOGLE_SERVICE_ACCOUNT') && SITE_URL);
+export const googleReady = () => !!(env('GOOGLE_ISSUER_ID') && (env('GOOGLE_SERVICE_ACCOUNT') || secret('GOOGLE_SERVICE_ACCOUNT')) && SITE_URL);
 
 // ---------- WalletWallet (free hosted signing, no Apple/Google accounts needed) ----------
 // Used for whichever wallet doesn't have its own keys configured above.
@@ -563,39 +563,126 @@ async function bumpAndPush(p: Profile, patch: Record<string, unknown> = {}) {
   return apnsPush(await tokensFor([p.serial]));
 }
 
-// ---------- Google ----------
-export async function googleSaveUrl(p: Profile, photoUrl: string | null) {
-  const creds = JSON.parse(secret('GOOGLE_SERVICE_ACCOUNT')!.toString('utf8'));
-  const issuer = env('GOOGLE_ISSUER_ID');
-  const classId = `${issuer}.${env('GOOGLE_CLASS_SUFFIX') || 'cpsc_membership'}`;
-  const text = (v: string) => ({ defaultValue: { language: 'en-US', value: v } });
-  const obj: Record<string, unknown> = {
-    id: `${issuer}.member_${p.serial.replace(/-/g, '')}`,
-    classId,
-    state: 'ACTIVE',
-    hexBackgroundColor: BG,
-    logo: { sourceUri: { uri: `${SITE_URL}/img/logo.png` }, contentDescription: text(ORG) },
-    cardTitle: text(ORG),
-    subheader: text('Member'),
-    header: text(p.name),
-    textModulesData: [
-      { id: 'status', header: 'Status', body: 'Active Member' },
-      { id: 'email', header: 'Email', body: p.email },
-    ],
-    barcode: { type: 'QR_CODE', value: QR(p.serial), alternateText: p.name },
-    linksModuleData: { uris: [{ uri: SITE_URL + '/card.html', description: 'Member portal', id: 'portal' }] },
-  };
-  if (photoUrl) obj.imageModulesData = [{ id: 'photo', mainImage: { sourceUri: { uri: photoUrl }, contentDescription: text(p.name) } }];
+// ---------- Google Wallet (club's own issuer account: free, unlimited live updates) ----------
+// Same look as the iPhone poster pass: dark card, lime CPSC logo, skier artwork, member name,
+// member # / check-in word / season row, QR code. Objects are created up front so the
+// check-in word, tests and removals update the pass on the phone without re-adding it.
+const G_API = 'https://walletobjects.googleapis.com/walletobjects/v1';
+const gText = (v: string) => ({ defaultValue: { language: 'en-US', value: v } });
+const gIssuer = () => env('GOOGLE_ISSUER_ID');
+const gClassId = () => `${gIssuer()}.${env('GOOGLE_CLASS_SUFFIX') || 'cpsc_member_2026'}`;
+const gObjectId = (p: Profile) => `${gIssuer()}.member_${p.serial.replace(/-/g, '')}`;
+function gCreds(): { client_email: string; private_key: string } {
+  const raw = env('GOOGLE_SERVICE_ACCOUNT') || secret('GOOGLE_SERVICE_ACCOUNT')?.toString('utf8') || '';
+  return JSON.parse(raw);
+}
 
-  const key = await importPKCS8(creds.private_key, 'RS256');
+let gToken: { value: string; exp: number } | null = null;
+async function googleToken() {
+  if (gToken && gToken.exp > Date.now() + 60_000) return gToken.value;
+  const c = gCreds();
+  const assertion = await new SignJWT({ scope: 'https://www.googleapis.com/auth/wallet_object.issuer' })
+    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+    .setIssuer(c.client_email).setAudience('https://oauth2.googleapis.com/token')
+    .setIssuedAt().setExpirationTime('1h').sign(await importPKCS8(c.private_key, 'RS256'));
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
+  });
+  const d = await r.json();
+  if (!r.ok) { console.error('Google token error', d); throw new Error('Google Wallet login failed — check the service account secret.'); }
+  gToken = { value: d.access_token, exp: Date.now() + d.expires_in * 1000 };
+  return gToken.value;
+}
+async function gFetch(path: string, method = 'GET', body?: unknown) {
+  return fetch(G_API + path, {
+    method, headers: { Authorization: `Bearer ${await googleToken()}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+const G_ROW = (path: string) => ({ firstValue: { fields: [{ fieldPath: `object.textModulesData['${path}']` }] } });
+function googleClass() {
+  return {
+    id: gClassId(),
+    issuerName: ORG,
+    hexBackgroundColor: BG,
+    multipleDevicesAndHoldersAllowedStatus: 'ONE_USER_ALL_DEVICES',
+    classTemplateInfo: {
+      cardTemplateOverride: {
+        cardRowTemplateInfos: [{ threeItems: { startItem: G_ROW('no'), middleItem: G_ROW('code'), endItem: G_ROW('season') } }],
+      },
+    },
+  };
+}
+function googleObject(p: Profile, code: string, voided = false) {
+  return {
+    id: gObjectId(p),
+    classId: gClassId(),
+    state: voided ? 'INACTIVE' : 'ACTIVE',
+    hexBackgroundColor: BG,
+    logo: { sourceUri: { uri: `${SITE_URL}/img/pass/google-logo.png` }, contentDescription: gText(SHORT) },
+    cardTitle: gText(ORG),
+    subheader: gText('LIVE TO SKI, LOVE TO PARTY'),
+    header: gText(p.name),
+    heroImage: { sourceUri: { uri: `${SITE_URL}/img/pass/google-hero.png` }, contentDescription: gText(`${SHORT} skier`) },
+    textModulesData: [
+      { id: 'no', header: p.is_admin ? 'EXEC BOARD' : 'MEMBER', body: voided ? 'Ended' : (memberNo(p) || 'Member') },
+      { id: 'code', header: 'CHECK-IN', body: voided ? '—' : code },
+      { id: 'season', header: 'SEASON', body: season() },
+    ],
+    barcode: { type: 'QR_CODE', value: QR(voided ? 'void' : p.serial) },
+    linksModuleData: { uris: [{ uri: SITE_URL + '/card.html', description: 'My CPSC card', id: 'card' }, { uri: CLUB, description: 'cpsconline.com', id: 'club' }] },
+  };
+}
+
+let gClassOk = false;
+async function ensureGoogleClass() {
+  if (gClassOk) return;
+  const cls = googleClass();
+  let r = await gFetch(`/genericClass/${cls.id}`, 'PUT', cls);            // update the design if it exists
+  if (r.status === 404) r = await gFetch('/genericClass', 'POST', cls);    // first time: create it
+  if (!r.ok) { console.error('Google class error', r.status, await r.text()); throw new Error('Google Wallet rejected the pass design.'); }
+  gClassOk = true;
+}
+// Update a member's Google pass in place (true = updated, false = they never saved one)
+export async function googleUpdate(p: Profile, code: string, voided = false) {
+  await ensureGoogleClass();
+  const r = await gFetch(`/genericObject/${gObjectId(p)}`, 'PUT', googleObject(p, code, voided));
+  if (r.status === 404) return false;
+  if (!r.ok) { console.error('Google update error', r.status, await r.text()); throw new Error('Google Wallet update failed.'); }
+  return true;
+}
+export async function googleSaveUrl(p: Profile) {
+  const code = p.pass_test_code || (await currentCode()).text;
+  // Create (or refresh) the object first so later updates reach the phone
+  if (!(await googleUpdate(p, code))) {
+    const r = await gFetch('/genericObject', 'POST', googleObject(p, code));
+    if (!r.ok && r.status !== 409) { console.error('Google create error', r.status, await r.text()); throw new Error('Google Wallet rejected the pass.'); }
+  }
+  const c = gCreds();
   const jwt = await new SignJWT({
-    iss: creds.client_email,
+    iss: c.client_email,
     aud: 'google',
     typ: 'savetowallet',
     origins: [new URL(SITE_URL).origin],
-    payload: { genericClasses: [{ id: classId }], genericObjects: [obj] },
-  }).setProtectedHeader({ alg: 'RS256', typ: 'JWT' }).setIssuedAt().sign(key);
+    payload: { genericObjects: [{ id: gObjectId(p), classId: gClassId() }] },
+  }).setProtectedHeader({ alg: 'RS256', typ: 'JWT' }).setIssuedAt().sign(await importPKCS8(c.private_key, 'RS256'));
   return `https://pay.google.com/gp/v/save/${jwt}`;
+}
+// Push the current word to every member's Google pass
+export async function googleRefreshAll() {
+  const code = (await currentCode()).text;
+  const { data } = await db.from('profiles').select(PROFILE_COLS);
+  const queue = [...((data || []) as Profile[])];
+  let updated = 0, failed = 0;
+  async function worker() {
+    for (let p = queue.shift(); p; p = queue.shift()) {
+      try { if (await googleUpdate(p, p.pass_test_code || code)) updated++; } catch { failed++; }
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  return { updated, failed };
 }
 
 // ---------- HTTP ----------
@@ -659,8 +746,9 @@ export async function handler(req: Request): Promise<Response> {
         const code = (await currentCode()).text;
         const apple = appleReady() ? await apnsPush(await tokensFor()) : { sent: 0, failed: 0, gone: 0 };
         const ww = wwReady() ? await wwRefreshAll() : { updated: 0, phones: 0, failed: 0, gone: 0, total: 0, quotaHit: false };
-        return json({ code, total: ww.total, updated: ww.updated + apple.sent, phones: ww.phones + apple.sent, failed: ww.failed + apple.failed,
-                      gone: ww.gone + apple.gone, quotaHit: ww.quotaHit, apple });
+        const google = googleReady() ? await googleRefreshAll() : { updated: 0, failed: 0 };
+        return json({ code, total: ww.total + google.updated, updated: ww.updated + apple.sent + google.updated, phones: ww.phones + apple.sent + google.updated,
+                      failed: ww.failed + apple.failed + google.failed, gone: ww.gone + apple.gone, quotaHit: ww.quotaHit, apple, google });
       }
       // Admin: check that Apple accepts the push certificate from here
       if (kind === 'apns-check') {
@@ -676,16 +764,17 @@ export async function handler(req: Request): Promise<Response> {
         return json({ passes: count || 0, applePhones: phones || 0 });
       }
       // Admin: send a test word to YOUR OWN pass (or put the real code back) to check live updates
-      if (kind === 'test' && appleReady() && (await tokensFor([p.serial])).length) {
+      const hasApple = appleReady() && (await tokensFor([p.serial])).length > 0;
+      const hasGoogle = kind === 'test' && googleReady() && (await googleUpdate(p, p.pass_test_code || (await currentCode()).text).catch(() => false));
+      if (kind === 'test' && (hasApple || hasGoogle)) {
         if (!(await isAdmin())) return json({ error: 'Admins only.' }, 403);
-        if (body.action === 'restore') {
-          const r = await bumpAndPush(p, { pass_test_code: null });
-          return json({ code: (await currentCode()).text, phones: r.sent, failed: r.failed });
-        }
+        const restore = body.action === 'restore';
         const t = new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
-        const testCode = `Test ${t}`;
-        const r = await bumpAndPush(p, { pass_test_code: testCode });
-        return json({ code: testCode, phones: r.sent, failed: r.failed });
+        const testCode = restore ? null : `Test ${t}`;
+        const r = hasApple ? await bumpAndPush(p, { pass_test_code: testCode }) : (await db.from('profiles').update({ pass_test_code: testCode }).eq('id', p.id), { sent: 0, failed: 0 });
+        const shown = testCode || (await currentCode()).text;
+        const g = hasGoogle ? await googleUpdate(p, shown).catch(() => false) : false;
+        return json({ code: shown, phones: r.sent + (g ? 1 : 0), failed: r.failed });
       }
       if (kind === 'test') {
         if (!(await isAdmin())) return json({ error: 'Admins only.' }, 403);
@@ -712,6 +801,7 @@ export async function handler(req: Request): Promise<Response> {
         const target = await profileFor(String(body.userId || ''));
         if (!target) return json({ ok: true, voided: 0 });
         let appleVoided = 0;
+        if (googleReady() && (await googleUpdate(target, '', true).catch(() => false))) appleVoided++;
         if (appleReady()) {
           await db.from('voided_passes').upsert({ serial: target.serial, name: target.name });
           appleVoided = (await apnsPush(await tokensFor([target.serial]))).sent;
@@ -734,9 +824,9 @@ export async function handler(req: Request): Promise<Response> {
           await retireOthers(p.id, cur.serial); // one working CPSC pass per member
           return json({ url: cur.googleSaveUrl });
         }
-        // Google's servers fetch the photo from this long-lived private link to show it on the pass
-        const { data: signed } = await db.storage.from('photos').createSignedUrl(`${p.id}/photo.jpg`, 60 * 60 * 24 * 365 * 5);
-        return json({ url: await googleSaveUrl(p, signed?.signedUrl ?? null) });
+        const url = await googleSaveUrl(p);
+        if (wwReady()) await retireOthers(p.id, null); // one working CPSC pass: void older hosted copies
+        return json({ url });
       }
       return json({ error: 'Unknown wallet type.' }, 400);
     }

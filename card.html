@@ -154,7 +154,8 @@ boot('member').then(async (ctx) => {
   $('#name').textContent = p.name;
   $('#email').textContent = p.email;
   $('#role').textContent = p.is_admin ? 'EXEC BOARD' : 'SKI CLUB MEMBER';
-  if (p.member_no) $('#memno').textContent = 'MEMBER #' + String(p.member_no).padStart(4, '0') + ' · SINCE ' + new Date(p.created_at).getFullYear();
+  const yr = new Date(p.created_at).getFullYear();
+  if (p.member_no) $('#memno').textContent = 'MEMBER #' + String(p.member_no).padStart(4, '0') + (yr ? ' · SINCE ' + yr : '');
   new QRCode($('#qr'), { text: 'CPSC1:' + p.serial, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
   loadPhoto();
 

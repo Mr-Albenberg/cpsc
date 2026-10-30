@@ -45,7 +45,7 @@
   </div>
   <div class="panel">
     <div class="toolbar"><h2 style="margin:0">Members <span class="pill" id="count"></span></h2><input type="search" id="mq" placeholder="Search members…"></div>
-    <div class="table-wrap"><table><thead><tr><th>Member</th><th>Last scanned</th><th>Scans</th><th>Role</th><th></th></tr></thead><tbody id="members"></tbody></table></div>
+    <ul class="member-list" id="members"></ul>
   </div>
 </main>
 <footer class="site-footer">
@@ -80,14 +80,22 @@ function drawApproved() {
 function drawMembers() {
   const q = $('#mq').value.toLowerCase();
   $('#count').textContent = members.length;
-  $('#members').innerHTML = members.filter((m) => (m.name + ' ' + m.email).toLowerCase().includes(q)).map((m) => `<tr>
-    <td><img class="avatar" src="${avatars[m.id] || 'img/logo.png'}" alt=""><strong>${esc(m.name)}</strong><div class="muted" style="margin-left:42px">${esc(m.email)}</div></td>
-    <td>${m.last_scan ? esc(fmtTime(m.last_scan)) : '<span class="muted">Never</span>'}</td>
-    <td>${m.scan_count}</td>
-    <td>${m.is_admin ? '<span class="pill admin">Admin</span>' : '<span class="pill">Member</span>'}
-      ${m.id === myId ? '' : `<button class="btn ghost small" data-admin="${m.id}" data-to="${m.is_admin ? 0 : 1}">${m.is_admin ? 'Remove admin' : 'Make admin'}</button>`}</td>
-    <td style="text-align:right">${m.id === myId ? '' : `<button class="btn danger small" data-del="${m.id}" data-name="${esc(m.name)}">Remove</button>`}</td></tr>`).join('')
-    || '<tr><td colspan="5" class="muted">No members yet.</td></tr>';
+  const ini = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  $('#members').innerHTML = members.filter((m) => (m.name + ' ' + m.email).toLowerCase().includes(q)).map((m) => {
+    const today = m.last_scan && Date.now() - Date.parse(m.last_scan) < 864e5;
+    const last = m.last_scan ? (today ? 'In today' : fmtTime(m.last_scan).split(' · ').pop()) : 'Never in';
+    return `<li>
+      <span class="av">${avatars[m.id] ? `<img src="${avatars[m.id]}" alt="">` : esc(ini(m.name))}</span>
+      <span class="who"><strong>${esc(m.name)}</strong><small>${esc(m.email)}</small></span>
+      <span class="meta">
+        <span class="nr">${m.is_admin ? '<i class="role-exec">Admin</i>' : ''}${m.member_no ? `<b>#${String(m.member_no).padStart(4, '0')}</b>` : ''}</span>
+        <i class="st ${today ? 'today' : m.last_scan ? '' : 'new'}" title="${m.last_scan ? esc(fmtTime(m.last_scan)) : ''}">${last} · ${m.scan_count} check-in${m.scan_count == 1 ? '' : 's'}</i>
+      </span>
+      ${m.id === myId ? '<span class="acts"><span class="muted">You</span></span>' : `<span class="acts">
+        <button class="btn ghost small" data-admin="${m.id}" data-to="${m.is_admin ? 0 : 1}">${m.is_admin ? 'Remove admin' : 'Make admin'}</button>
+        <button class="btn danger small" data-del="${m.id}" data-name="${esc(m.name)}">Remove</button></span>`}
+    </li>`;
+  }).join('') || '<li class="none">No members match.</li>';
 }
 async function load() {
   const [a, m] = await Promise.all([
@@ -95,6 +103,9 @@ async function load() {
     sb.rpc('admin_members'),
   ]);
   approved = a.data || []; members = m.data || [];
+  const { data: nos } = await sb.from('profiles').select('id,member_no');
+  const noOf = Object.fromEntries((nos || []).map((r) => [r.id, r.member_no]));
+  members.forEach((x) => { x.member_no = noOf[x.id] ?? x.member_no; });
   drawApproved(); drawMembers();
   if (members.length) {
     const { data } = await sb.storage.from('photos').createSignedUrls(members.map((x) => `${x.id}/thumb.png`), 3600);

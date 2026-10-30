@@ -10,7 +10,7 @@
   <div class="lookup">
     <label for="q" class="sr">Find a member by name or email</label>
     <input id="q" type="search" placeholder="Search name or email…" autocomplete="off" enterkeyhint="search">
-    <ul class="lookup-list" id="results" hidden></ul>
+    <ul class="lookup-list" id="results" role="listbox" aria-label="Matching members" hidden></ul>
   </div>
   <div class="panel" style="padding:14px">
     <div id="reader"></div>
@@ -250,18 +250,61 @@ boot('admin').then(() => {
   let qTimer;
   $('#q').addEventListener('focus', loadMembers, { once: true });
   $('#q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(search, 120); };
+  // Member photos for the result list (signed links, cached)
+  const thumbs = {};
+  async function thumbsFor(ids) {
+    const need = ids.filter((id) => !(id in thumbs));
+    if (!need.length) return;
+    need.forEach((id) => (thumbs[id] = null));
+    const { data } = await sb.storage.from('photos').createSignedUrls(need.map((id) => id + '/thumb.png'), 3600);
+    (data || []).forEach((d, i) => { if (d.signedUrl && !d.error) thumbs[need[i]] = d.signedUrl; });
+  }
+  const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  const mark = (text, q) => {
+    const i = norm(text).indexOf(q);
+    return i < 0 ? esc(text) : esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
+  };
+  const statusOf = (m) => {
+    if (!m.last_scan) return ['new', 'Never in'];
+    if (Date.now() - Date.parse(m.last_scan) < 864e5) return ['today', 'In today'];
+    return ['', fmtTime(m.last_scan).split(' · ').pop()];
+  };
+  let hitIds = [], active = -1;
   async function search() {
-    const q = norm($('#q').value.trim()), list = $('#results');
-    if (!q) { list.hidden = true; return; }
+    const raw = $('#q').value.trim(), q = norm(raw), list = $('#results');
+    if (!q) { list.hidden = true; hitIds = []; return; }
     const all = await loadMembers();
-    const hits = all.filter((m) => norm(m.name).includes(q) || norm(m.email).includes(q)).slice(0, 8);
+    const hits = all.filter((m) => norm(m.name).includes(q) || norm(m.email).includes(q))
+      .sort((a, b) => (norm(b.name).startsWith(q) - norm(a.name).startsWith(q)) || a.name.localeCompare(b.name)).slice(0, 8);
+    hitIds = hits.map((m) => m.id); active = -1;
+    await thumbsFor(hitIds);
+    if (norm($('#q').value.trim()) !== q) return; // typed more while loading
     list.hidden = false;
-    list.innerHTML = hits.length ? hits.map((m) => `<li><button type="button" data-id="${m.id}">
-        <strong>${esc(m.name)}</strong><span>${esc(m.email)}${m.member_no ? ' · #' + String(m.member_no).padStart(4, '0') : ''}</span>
-        <em>${m.last_scan ? 'Last in ' + esc(fmtTime(m.last_scan)) : 'Never checked in'}</em></button></li>`).join('')
-      : '<li class="none">No member matches “' + esc($('#q').value.trim()) + '”</li>';
+    list.innerHTML = hits.length
+      ? `<li class="count">${hits.length === 8 ? 'Top 8 matches' : hits.length + (hits.length === 1 ? ' member' : ' members')}</li>` + hits.map((m) => {
+          const [cls, st] = statusOf(m);
+          const no = m.member_no ? '#' + String(m.member_no).padStart(4, '0') : '';
+          return `<li><button type="button" data-id="${m.id}" role="option">
+            <span class="av">${thumbs[m.id] ? `<img src="${thumbs[m.id]}" alt="">` : esc(initials(m.name))}</span>
+            <span class="who"><strong>${mark(m.name, q)}</strong><small>${mark(m.email, q)}</small></span>
+            <span class="meta"><span class="nr">${m.is_admin ? '<i class="role-exec">Exec</i>' : ''}${no ? `<b>${no}</b>` : ''}</span><i class="st ${cls}">${esc(st)}</i></span>
+          </button></li>`;
+        }).join('')
+      : `<li class="none"><b>No matches</b>Nobody’s name or email contains “${esc(raw)}”.</li>`;
     list.querySelectorAll('button').forEach((b) => b.onclick = () => lookup(all.find((m) => m.id === b.dataset.id)));
   }
+  // Arrow keys + Enter in the search box
+  $('#q').addEventListener('keydown', (e) => {
+    const btns = [...$('#results').querySelectorAll('button')];
+    if (!btns.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      active = (active + (e.key === 'ArrowDown' ? 1 : -1) + btns.length) % btns.length;
+      btns.forEach((b, i) => b.classList.toggle('on', i === active));
+      btns[active].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') { e.preventDefault(); (btns[active] || btns[0]).click(); }
+    else if (e.key === 'Escape') { $('#q').value = ''; $('#results').hidden = true; }
+  });
   let looked = null;
   async function lookup(p) {
     looked = p;

@@ -117,3 +117,15 @@ The look comes from cpsconline.com: lime header (`#ecffb0`), the black CPSC moun
 - Members can only see their own profile and photo. Approved list, member list, other photos and scanning are admin-only.
 - Removing an email from the approved list blocks *new* sign-ups only. Use **Remove** on the member to revoke an existing card.
 - If a member changes their photo they should re-add the pass.
+
+## Google Wallet with the club's own account (Android passes that match the iPhone ones)
+Without this, Android passes come from WalletWallet's free plan, which can't show the club colors, logo or artwork. With the club's own Google Wallet issuer account (free), Android passes look like the iPhone poster pass — dark card, lime CPSC logo, skier artwork (`img/pass/google-hero.png`, `google-logo.png`), member name, member # · check-in word · season, QR code — and the check-in word, tests and removals update on the phone with no re-add (free and unlimited).
+
+1. **pay.google.com/business/console** → sign in with the club Google account → **Google Wallet API** → accept the terms. Copy the **Issuer ID** (a long number).
+2. **console.cloud.google.com** → create a project (e.g. "cpsc-wallet") → **APIs & Services → Enable APIs** → enable **Google Wallet API**.
+3. **IAM & Admin → Service Accounts → Create** (name it "cpsc-wallet", no roles needed) → open it → **Keys → Add key → JSON** → a .json file downloads.
+4. Back in the Pay & Wallet Console → **Users → Invite a user** → paste the service account's email (…@….iam.gserviceaccount.com) → role **Developer**.
+5. Supabase → Edge Functions → **Secrets**: add `GOOGLE_ISSUER_ID` = the Issuer ID, and `GOOGLE_SERVICE_ACCOUNT` = the whole contents of the .json file (paste it as-is).
+6. In the Pay & Wallet Console, **Google Wallet API → Manage → Request publishing access** (Google reviews it, usually a few days). Until then only accounts listed under **Users / test users** can save passes, and they're marked "test".
+
+Members who already added the WalletWallet version get the new pass by tapping **Add to Google Wallet** again; the old one is voided automatically.
