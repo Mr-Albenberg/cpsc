@@ -108,10 +108,25 @@ boot('admin').then(() => {
       for (const s of [0, 0.26]) { tone(c, t + s, 240, 0.21, 'sawtooth', 0.32, 200); tone(c, t + s, 247, 0.21, 'square', 0.16, 205); }
     },
   };
+  // Real gate recordings in sounds/ (valid = ski-pass gate scanner; invalid = matching reject tone)
+  const buffers = {};
+  const loadSounds = async () => {
+    const c = audio(); if (!c) return;
+    for (const k of ['valid', 'invalid']) {
+      if (buffers[k]) continue;
+      try { const r = await fetch('sounds/gate-' + k + '.mp3'); buffers[k] = await c.decodeAudioData(await r.arrayBuffer()); } catch {}
+    }
+  };
   const beep = (ok) => {
-    try { const c = audio(); if (c) { out(c); SOUNDS[ok ? 'good' : 'bad'](c, c.currentTime + 0.02); } } catch {}
+    try {
+      const c = audio(); if (!c) return;
+      const buf = buffers[ok ? 'valid' : 'invalid'];
+      if (buf) { const s = c.createBufferSource(); s.buffer = buf; s.connect(c.destination); s.start(); }
+      else { out(c); SOUNDS[ok ? 'good' : 'bad'](c, c.currentTime + 0.02); loadSounds(); }
+    } catch {}
     navigator.vibrate?.(ok ? 90 : [180, 80, 180]);
   };
+  document.addEventListener('pointerdown', () => loadSounds(), { once: true });
   window.testSound = beep;
   const row = (k, v) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
   const ICON = { ok: '✓', warn: '!', bad: '✕' };
@@ -194,7 +209,7 @@ boot('admin').then(() => {
   $('#sGood').onclick = () => beep(true);
   $('#sBad').onclick = () => beep(false);
   $('#start').onclick = async () => {
-    audio();
+    audio(); loadSounds();
     try {
       await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } }, onScan);
       $('#start').style.display = 'none'; $('#ready').hidden = false;
