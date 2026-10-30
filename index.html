@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Questrial&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png"><title>Home · Central Pacific Ski Club</title></head>
 <body>
-<script>try { if (Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k) && localStorage.getItem(k))) location.replace('card.html'); } catch (e) {}</script>
+<script>try { if (Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k) && localStorage.getItem(k))) location.replace(localStorage.getItem('cpsc-role') === 'admin' ? 'scan.html' : 'card.html'); } catch (e) {}</script>
 <main class="club">
 
 <section class="home-banner"><img src="img/site/home-hero.webp" alt="Welcome to Central Pacific Ski Club — members celebrating in the snow" width="2400" height="1600"></section>

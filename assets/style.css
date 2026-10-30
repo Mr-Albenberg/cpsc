@@ -9,6 +9,7 @@
   --muted: #5f5f5f;
   --line: #e6e6e6;
   --snow: #fafaf7;        /* page background */
+  --glow-c: #d6ff6e;      /* neon glow (editable in the site editor) */
   --danger: #d23b3b;
   --ok: #1f9d55;
   --radius: 10px;
@@ -126,7 +127,7 @@ input:focus, textarea:focus { outline: none; border-color: var(--black); box-sha
 }
 .member-card::before { /* lime glow behind the mountains */
   content: ""; position: absolute; right: -70px; top: -90px; width: 260px; height: 260px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(236, 255, 176, .22), transparent 68%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--lime) 22%, transparent), transparent 68%);
 }
 .member-card > * { position: relative; }
 .member-card .top { display: flex; justify-content: space-between; align-items: center; }
@@ -203,7 +204,7 @@ footer.site-footer { background: var(--dark); color: #cfcfcf; text-align: center
 /* ===== Live security strip (on the website card) ===== */
 .live-strip {
   position: relative; overflow: hidden; margin-top: 16px; border-radius: 12px; padding: 10px 14px 12px; text-align: center; color: #000;
-  background: linear-gradient(110deg, #ecffb0, #c6f7ff, #ffffff, #d9ff7a, #ecffb0, #c6f7ff, #ecffb0);
+  background: linear-gradient(110deg, var(--lime), #c6f7ff, #ffffff, var(--glow-c), var(--lime), #c6f7ff, var(--lime));
   background-size: 300% 100%; animation: holo 6s linear infinite;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15);
 }
@@ -552,11 +553,11 @@ main.club .exec-photos img { width: 100%; height: 100%; object-fit: cover; displ
 /* =====================================================================
    FX — futuristic touches (all GPU-friendly; off for reduced motion)
    ===================================================================== */
-:root { --glow: rgba(214, 255, 110, .85); --glow-soft: rgba(214, 255, 110, .35); }
+:root { --glow: color-mix(in srgb, var(--glow-c) 85%, transparent); --glow-soft: color-mix(in srgb, var(--glow-c) 35%, transparent); }
 
 /* Sticky glass header that lights up once you scroll */
 .site-header { position: sticky; top: 0; z-index: 40; transition: box-shadow .3s, background-color .3s; }
-.site-header.scrolled { background: rgba(236, 255, 176, .86); backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
+.site-header.scrolled { background: color-mix(in srgb, var(--lime) 86%, transparent); backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
   box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 10px 30px -12px rgba(120, 160, 0, .55); }
 .brand img { transition: filter .25s, transform .25s; }
 .brand:hover img { filter: drop-shadow(0 0 10px rgba(0,0,0,.25)); transform: translateY(-1px); }
@@ -576,7 +577,7 @@ main.club .exec-photos img { width: 100%; height: 100%; object-fit: cover; displ
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .15s;
   background: radial-gradient(260px circle at var(--mx) var(--my), var(--glow-soft), transparent 65%); }
 .sec.dark .card::after, .cta-band::after, .member-card::after, .tile::after {
-  background: radial-gradient(300px circle at var(--mx) var(--my), rgba(214,255,110,.22), transparent 60%); mix-blend-mode: screen; }
+  background: radial-gradient(300px circle at var(--mx) var(--my), color-mix(in srgb, var(--glow-c) 22%, transparent), transparent 60%); mix-blend-mode: screen; }
 .card:hover::after, .tile:hover::after, .sponsor:hover::after, .panel:hover::after, .price-card:hover::after, .cta-band:hover::after, .member-card:hover::after { opacity: 1; }
 .panel::after { opacity: 0 !important; } /* forms: no sheen over inputs */
 .panel:has(#reader)::after { display: none; }
@@ -584,9 +585,9 @@ main.club .exec-photos img { width: 100%; height: 100%; object-fit: cover; displ
 /* Buttons: glow + light sweep */
 .btn { position: relative; overflow: hidden; isolation: isolate; transition: box-shadow .15s, transform .1s, background-color .15s; }
 .btn::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .25s;
-  background: radial-gradient(120px circle at var(--mx) var(--my), rgba(214,255,110,.45), transparent 70%); }
+  background: radial-gradient(120px circle at var(--mx) var(--my), color-mix(in srgb, var(--glow-c) 45%, transparent), transparent 70%); }
 .btn:hover::before { opacity: 1; }
-.btn:hover { box-shadow: 0 0 0 1px rgba(214,255,110,.6), 0 8px 26px -8px var(--glow); }
+.btn:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--glow-c) 60%, transparent), 0 8px 26px -8px var(--glow); }
 .btn.lime:hover, .btn.ghost:hover { box-shadow: 0 0 0 1px #000, 0 8px 26px -8px var(--glow); }
 .btn:active { transform: translateY(1px) scale(.99); }
 :focus-visible { outline: 2px solid #000; outline-offset: 2px; box-shadow: 0 0 0 5px var(--glow-soft); }
@@ -595,7 +596,7 @@ input:focus, textarea:focus { box-shadow: 0 0 0 3px var(--lime), 0 0 22px -4px v
 /* Headline glow on hover */
 h1, h2, .big, .tile strong, .exec-text h2, .site-footer .tag, .stats b { transition: text-shadow .15s ease, transform .15s ease; }
 .club-hero h1:hover, .sec.dark h1:hover, .sec.dark h2:hover, .cta-band h2:hover, .site-footer .tag:hover, .tile:hover strong {
-  text-shadow: 0 0 18px rgba(214,255,110,.75), 0 0 42px rgba(214,255,110,.35); }
+  text-shadow: 0 0 18px color-mix(in srgb, var(--glow-c) 75%, transparent), 0 0 42px color-mix(in srgb, var(--glow-c) 35%, transparent); }
 .sec:not(.dark) h2:hover, .sec:not(.dark) .big:hover, .hero h1:hover, .home-intro h1:hover, .exec-text h2:hover, .stats b:hover {
   text-shadow: 0 0 1px #000, 0 0 22px rgba(170, 230, 40, .9), 0 0 48px rgba(200, 255, 90, .55); }
 .site-footer .links a { transition: color .2s, text-shadow .2s; }
@@ -603,7 +604,7 @@ h1, h2, .big, .tile strong, .exec-text h2, .site-footer .tag, .stats b { transit
 
 /* Shimmering lime words in hero headlines */
 .club-hero h1 em, .sec.dark .big span, .cta-band h2 em {
-  background: linear-gradient(100deg, #ecffb0 20%, #ffffff 40%, #c9ff4a 55%, #ecffb0 75%) 0 0 / 250% 100%;
+  background: linear-gradient(100deg, var(--lime) 20%, #ffffff 40%, var(--glow-c) 55%, var(--lime) 75%) 0 0 / 250% 100%;
   -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 3.2s linear infinite; }
 @keyframes shine { to { background-position: -250% 0; } }
 
@@ -622,7 +623,7 @@ h1, h2, .big, .tile strong, .exec-text h2, .site-footer .tag, .stats b { transit
 /* Photo heroes: slow zoom + scanline sweep */
 .club-hero { overflow: hidden; }
 .club-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(180deg, transparent 0 46%, rgba(214,255,110,.10) 50%, transparent 54% 100%) 0 0 / 100% 200%;
+  background: linear-gradient(180deg, transparent 0 46%, color-mix(in srgb, var(--glow-c) 10%, transparent) 50%, transparent 54% 100%) 0 0 / 100% 200%;
   animation: sweepY 3.6s linear infinite; }
 @keyframes sweepY { from { background-position: 0 -100%; } to { background-position: 0 100%; } }
 .home-banner { overflow: hidden; }
@@ -633,7 +634,7 @@ h1, h2, .big, .tile strong, .exec-text h2, .site-footer .tag, .stats b { transit
 /* Tilt targets ease back smoothly */
 .tile, .sponsor, .member-card, .price-card { transition: transform .18s ease-out, box-shadow .25s; transform-style: preserve-3d; }
 .sponsor:hover { box-shadow: 0 18px 40px -12px rgba(0,0,0,.25), 0 0 0 1px #000, 0 0 30px -6px var(--glow); }
-.tile:hover { box-shadow: 0 20px 40px -14px rgba(0,0,0,.5), 0 0 0 1px rgba(214,255,110,.5); }
+.tile:hover { box-shadow: 0 20px 40px -14px rgba(0,0,0,.5), 0 0 0 1px color-mix(in srgb, var(--glow-c) 50%, transparent); }
 
 /* Live dot + chips get a soft neon pulse */
 .kicker { box-shadow: 0 0 0 0 var(--glow-soft); transition: box-shadow .3s; }
@@ -677,7 +678,7 @@ h1, h2, .big, .tile strong, .exec-text h2, .site-footer .tag, .stats b { transit
 /* Season / info cards: the big number slides in and lights up, top edge draws a lime line */
 .card { transition: box-shadow .15s, transform .15s; }
 .card:hover { box-shadow: inset 0 3px 0 var(--lime), var(--shadow); transform: translateY(-2px); }
-.sec.dark .card:hover { box-shadow: inset 0 3px 0 var(--lime), 0 14px 34px -14px rgba(214,255,110,.35); }
+.sec.dark .card:hover { box-shadow: inset 0 3px 0 var(--lime), 0 14px 34px -14px color-mix(in srgb, var(--glow-c) 35%, transparent); }
 .season .num { transition: transform .2s cubic-bezier(.3,1.6,.5,1), opacity .15s, text-shadow .15s; }
 .season:hover .num { transform: translateX(-8px) scale(1.08); opacity: 1; text-shadow: 0 0 24px var(--glow); }
 
@@ -729,4 +730,57 @@ main.club .exec-photos button:hover img { transform: scale(1.08) rotate(-1deg); 
 @media (prefers-reduced-motion: reduce) {
   .btn:hover::after, .kicker:hover { animation: none; }
   .tile strong, .sponsor img, .price-card b, .season .num, .ticket, .checks li::before { transition: none; }
+}
+
+/* ===== Admin site editor (assets/editor.js) ===== */
+.exec-text h2 i { font-style: normal; }
+.ed-ui { font-family: "Questrial", system-ui, sans-serif; }
+.ed-fab { position: fixed; left: 16px; bottom: 16px; z-index: 90; display: inline-flex; align-items: center; gap: 8px;
+  background: #000; color: var(--lime); border: 0; border-radius: 999px; padding: 12px 18px; cursor: pointer;
+  font: 400 1.15rem/1 "Bebas Neue", sans-serif; letter-spacing: .06em; box-shadow: 0 0 0 2px var(--lime), 0 10px 30px -8px rgba(0,0,0,.5); }
+.ed-fab:hover { box-shadow: 0 0 0 2px var(--lime), 0 0 24px -2px var(--glow); }
+.ed-fab span { font-size: 1.2rem; }
+.ed-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 95; width: min(820px, calc(100vw - 24px));
+  display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap;
+  background: rgba(10,10,10,.94); color: #eee; border-radius: 16px; padding: 10px 12px 10px 16px;
+  box-shadow: 0 0 0 1.5px var(--lime), 0 18px 40px -12px rgba(0,0,0,.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.ed-bar[hidden], .ed-colors[hidden], .ed-pop[hidden], .ed-fab[hidden] { display: none; }
+.ed-status { font-size: .92rem; min-width: 0; flex: 1 1 240px; }
+.ed-status b { font: 400 1.05rem/1 "Bebas Neue", sans-serif; letter-spacing: .1em; color: var(--lime); margin-right: 6px; }
+.ed-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ed-btn { background: #222; color: #fff; border: 1px solid #3a3a3a; border-radius: 8px; padding: 9px 12px; cursor: pointer;
+  font: 400 1rem/1 "Bebas Neue", sans-serif; letter-spacing: .06em; }
+.ed-btn:hover { border-color: var(--lime); }
+.ed-btn[aria-expanded="true"] { background: #333; border-color: var(--lime); }
+.ed-save { background: var(--lime); color: #000; border-color: var(--lime); }
+.ed-save:disabled { opacity: .45; cursor: default; }
+.ed-colors { position: fixed; right: max(12px, calc(50vw - 410px)); bottom: 86px; z-index: 96; width: min(300px, calc(100vw - 24px));
+  background: #111; color: #eee; border-radius: 14px; padding: 14px; box-shadow: 0 0 0 1.5px #333, 0 18px 40px -12px rgba(0,0,0,.6); }
+.ed-ph { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.ed-ph b { font: 400 1.2rem/1 "Bebas Neue", sans-serif; letter-spacing: .08em; color: var(--lime); }
+.ed-ph span { font-size: .8rem; color: #999; }
+.ed-color { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: .92rem; cursor: pointer; }
+.ed-color span { flex: 1; }
+.ed-color input { width: 38px; height: 30px; padding: 0; border: 1px solid #444; border-radius: 6px; background: none; cursor: pointer; }
+.ed-mini { background: none; border: 0; color: #999; font-size: 1.1rem; cursor: pointer; padding: 4px 6px; }
+.ed-mini:hover { color: var(--lime); }
+.ed-wide { width: 100%; margin-top: 8px; }
+.ed-pop { position: fixed; z-index: 96; display: flex; gap: 6px; background: rgba(10,10,10,.94); padding: 8px; border-radius: 12px;
+  box-shadow: 0 0 0 1.5px var(--lime), 0 12px 30px -10px rgba(0,0,0,.6); }
+.ed-pop [hidden] { display: none; }
+
+/* What's editable while editing */
+body.editing { padding-bottom: 90px; }
+body.editing [data-ed-text] { outline: 1.5px dashed rgba(127,127,127,.55); outline-offset: 3px; border-radius: 2px; cursor: text; }
+body.editing [data-ed-text]:hover { outline-color: var(--glow-c); }
+body.editing [data-ed-text]:focus { outline: 2px solid var(--glow-c); box-shadow: 0 0 0 6px color-mix(in srgb, var(--glow-c) 25%, transparent); }
+body.editing [data-ed-img] { outline: 2px dashed color-mix(in srgb, var(--glow-c) 80%, #000); outline-offset: -2px; cursor: copy; }
+body.editing [data-ed-img]:hover { outline-style: solid; filter: brightness(1.06); }
+body.editing .band div { animation-play-state: paused; }
+body.editing main a { cursor: text; }
+@media (max-width: 560px) {
+  .ed-bar { bottom: 8px; padding: 10px; }
+  .ed-actions { width: 100%; } .ed-actions .ed-btn { flex: 1 1 auto; padding: 10px 8px; }
+  .ed-colors { bottom: 140px; right: 12px; }
+  body.editing { padding-bottom: 150px; }
 }

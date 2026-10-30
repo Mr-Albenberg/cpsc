@@ -26,6 +26,7 @@
   const counters = document.querySelectorAll('.stats b');
   if (counters.length && !reduce && 'IntersectionObserver' in window) {
     const run = (b) => {
+      if (document.body.classList.contains('editing')) return; // an admin is editing these numbers
       const txt = b.textContent, m = txt.match(/\d[\d,]*/);
       if (!m) return;
       const end = parseInt(m[0].replace(/,/g, ''), 10), from = end > 1000 && end < 2100 ? end - 60 : 0;
@@ -33,6 +34,7 @@
       const step = (t) => {
         const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
         const v = Math.round(from + (end - from) * e);
+        if (document.body.classList.contains('editing')) { b.textContent = txt; return; }
         b.textContent = txt.replace(m[0], end >= 10000 || m[0].includes(',') ? v.toLocaleString() : String(v));
         if (k < 1) requestAnimationFrame(step);
       };
@@ -47,7 +49,7 @@
     let cur = null, raf = 0, pos = null;
     const reset = (el) => { el.style.transition = ''; el.style.transform = ''; };
     document.addEventListener('pointermove', (e) => {
-      const el = e.target.closest?.('.tile, .sponsor, .member-card, .price-card');
+      const el = document.body.classList.contains('editing') ? null : e.target.closest?.('.tile, .sponsor, .member-card, .price-card'); // hold still while an admin edits
       if (cur && cur !== el) reset(cur);
       cur = el; pos = e;
       if (!el || raf) return;

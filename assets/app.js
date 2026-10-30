@@ -32,7 +32,7 @@
     const btn = header.querySelector('.menu-btn');
     btn.onclick = () => { const open = header.classList.toggle('open'); btn.setAttribute('aria-expanded', open); };
     const lo = document.getElementById('logout');
-    if (lo) lo.onclick = async () => { await sb.auth.signOut(); location.href = 'home.html'; };
+    if (lo) lo.onclick = async () => { await sb.auth.signOut(); setRole(null); location.href = 'home.html'; };
   }
 
   function showSetup() {
@@ -42,11 +42,21 @@
       Supabase project URL and anon key (Supabase → Project Settings → API). See the README for the full setup.</p></div>`;
   }
 
-  // Where to go after logging in (?next=exec-board.html), only pages on this site
-  window.nextPage = function () {
+  // Where to go after logging in (?next=exec-board.html), only pages on this site. Admins land on the scanner.
+  window.nextPage = function (admin) {
     const n = new URLSearchParams(location.search).get('next') || '';
-    return /^[a-z0-9-]+\.html$/.test(n) && !['index.html', 'login.html'].includes(n) ? n : 'card.html';
+    return /^[a-z0-9-]+\.html$/.test(n) && !['index.html', 'login.html'].includes(n) ? n : (admin ? 'scan.html' : 'card.html');
   };
+  // Remembered so the site root can send you straight to your page before anything loads
+  function setRole(role) { try { role ? localStorage.setItem('cpsc-role', role) : localStorage.removeItem('cpsc-role'); } catch (e) {} }
+  window.setRole = setRole;
+  const homeFor = (admin) => (admin ? 'scan.html' : 'card.html');
+  let editorLoaded = false;
+  function maybeEditor(isAdmin) {
+    if (!isAdmin || editorLoaded || !SC.editable) return;
+    editorLoaded = true;
+    const s = document.createElement('script'); s.src = 'assets/editor.js?v=1'; document.body.appendChild(s);
+  }
 
   // need: 'guest' | 'member' | 'admin' | 'any' | 'public'
   window.boot = async function (need) {
@@ -55,13 +65,19 @@
     const { data: { session } } = await sb.auth.getSession();
     if (need === 'any') return { session };
     if (need === 'public') { // club pages: open to everyone, header shows the right account links
-      if (session && file === 'index.html') { location.replace('card.html'); throw new Error('redirect'); } // site root → your card
+      if (session && file === 'index.html') { // site root → your card (admins: the scanner)
+        const { data } = await sb.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
+        if (data) { setRole(data.is_admin ? 'admin' : 'member'); location.replace(homeFor(data.is_admin)); throw new Error('redirect'); }
+      }
       if (session) sb.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle()
-        .then(({ data }) => data && renderHeader(data.is_admin ? 'admin' : 'member'));
+        .then(({ data }) => { if (!data) return; setRole(data.is_admin ? 'admin' : 'member'); renderHeader(data.is_admin ? 'admin' : 'member'); maybeEditor(data.is_admin); });
       return { session };
     }
     if (need === 'guest') {
-      if (session) { location.replace(window.nextPage()); throw new Error('redirect'); }
+      if (session) {
+        const { data } = await sb.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
+        location.replace(window.nextPage(data?.is_admin)); throw new Error('redirect');
+      }
       return {};
     }
     if (!session) { location.replace('login.html?next=' + encodeURIComponent(file)); throw new Error('redirect'); }
@@ -73,6 +89,8 @@
     }
     if (need === 'admin' && !profile.is_admin) { location.replace('card.html'); throw new Error('redirect'); }
     renderHeader(profile.is_admin ? 'admin' : 'member');
+    setRole(profile.is_admin ? 'admin' : 'member');
+    maybeEditor(profile.is_admin);
     return { session, profile };
   };
 
@@ -113,6 +131,127 @@
     const title = (w) => w.toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
     return data ? { word: data.week_word, text: title(data.week_word), updatedAt: data.updated_at } : null;
   };
+
+  // ===== Site content admins edit from the site (text, photos, colors) =====
+  // Saved edits live in the site_content table. Each one remembers where the element sits and what it originally said,
+  // so it still finds its spot if the page is rebuilt. Animations and layout are never editable.
+  const EDITABLE = ['home.html', 'about.html', 'events.html', 'big-trip.html', 'ikon.html', 'sponsors.html', 'join.html', 'exec-board.html'];
+  const THEME = {
+    '--lime': ['Accent: header & highlights', '#ecffb0'],
+    '--glow-c': ['Neon glow', '#d6ff6e'],
+    '--dark': ['Dark sections & footer', '#121212'],
+    '--snow': ['Page background', '#fafaf7'],
+    '--ink': ['Text', '#111111'],
+    '--lime-deep': ['Accent, deeper', '#d7f27a'],
+  };
+  const INLINE = new Set(['B', 'STRONG', 'EM', 'I', 'U', 'SPAN', 'A', 'BR', 'SMALL', 'MARK', 'SUP', 'SUB']);
+  const SITE_IMG = CFG.supabaseUrl ? CFG.supabaseUrl.replace(/\/$/, '') + '/storage/v1/object/public/site/' : '//none/';
+  const norm = (s) => String(s ?? '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Only harmless inline formatting survives: bold/italic/links/line breaks, no scripts or styles
+  function sanitize(html) {
+    const doc = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html');
+    const clean = (node) => {
+      for (const c of [...node.childNodes]) {
+        if (c.nodeType === 3) continue;
+        if (c.nodeType !== 1) { c.remove(); continue; }
+        if (!INLINE.has(c.tagName)) { c.replaceWith(doc.createTextNode(c.textContent)); continue; }
+        for (const { name: n, value: v } of [...c.attributes]) {
+          const ok = (n === 'class' && /^[\w\s-]*$/.test(v))
+            || (c.tagName === 'A' && n === 'href' && /^(https?:|mailto:|tel:|#|[\w-]+\.html(#[\w-]*)?$)/i.test(v))
+            || (c.tagName === 'A' && ((n === 'target' && v === '_blank') || n === 'rel'))
+            || (n === 'style' && /^color:\s*var\(--[\w-]+\);?$/.test(v));
+          if (!ok) c.removeAttribute(n);
+        }
+        clean(c);
+      }
+    };
+    clean(doc.body);
+    return doc.body.innerHTML;
+  }
+  const safeImg = (v) => (typeof v === 'string' && !/["'()\\\s]/.test(v) && (v.startsWith(SITE_IMG) || /^img\/[\w\/.-]+$/.test(v)) ? v : null);
+
+  const SC = window.siteContent = { page: here, EDITABLE, THEME, sanitize, safeImg, norm, SITE_IMG, items: [], rows: [], applied: new Map(),
+    editable: EDITABLE.includes(here) };
+
+  function pathOf(root, el) { const p = []; while (el && el !== root) { p.unshift([...el.parentNode.children].indexOf(el)); el = el.parentNode; } return p.join('.'); }
+  const bgUrl = (el) => (el.style.backgroundImage.match(/url\(["']?([^"')]+)["']?\)/) || [])[1];
+  const isTextBlock = (el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())
+    && [...el.querySelectorAll('*')].every((d) => INLINE.has(d.tagName));
+  // The band ticker repeats its words twice; only the first copy is edited and the second mirrors it
+  const twin = (el) => {
+    const row = el.parentElement;
+    if (!row?.parentElement?.classList.contains('band')) return null;
+    const kids = [...row.children], half = kids.length / 2, i = kids.indexOf(el);
+    return i < half ? kids[i + half] : null;
+  };
+
+  function collect() {
+    const items = [];
+    const scopes = [['main', SC.editable && document.querySelector('main')], ['foot', document.querySelector('.site-footer')]];
+    for (const [scope, root] of scopes) {
+      if (!root) continue;
+      const page = scope === 'foot' ? '*' : here;
+      const walk = (el) => {
+        if (el.hasAttribute('data-noedit') || el.matches('.lightbox, script, style, svg, input, textarea, select, form, .links')) return;
+        const base = { scope, page, el, path: pathOf(root, el) };
+        if (el.tagName === 'IMG') { const o = el.getAttribute('src'); if (o) items.push({ ...base, kind: 'img', orig: o }); return; }
+        if (el !== root && el.style.backgroundImage) { const o = bgUrl(el); if (o) items.push({ ...base, kind: 'img', bg: true, orig: o }); }
+        if (el !== root && isTextBlock(el)) {
+          const row = el.parentElement;
+          if (row?.parentElement?.classList.contains('band') && [...row.children].indexOf(el) >= row.children.length / 2) return;
+          items.push({ ...base, kind: 'text', origHTML: el.innerHTML, orig: norm(el.innerHTML), origClean: norm(sanitize(el.innerHTML)) });
+          return;
+        }
+        for (const c of [...el.children]) walk(c);
+      };
+      walk(root);
+    }
+    return items;
+  }
+
+  SC.keyOf = (it) => `${it.kind}:${it.page}:${it.scope}:${it.path}`;
+  SC.setText = (it, html) => { it.el.innerHTML = html; const t = twin(it.el); if (t) t.innerHTML = html; };
+  SC.setImg = (it, url) => {
+    const u = safeImg(url); if (!u) return;
+    if (it.bg) it.el.style.backgroundImage = `url("${u}")`; else { it.el.removeAttribute('srcset'); it.el.src = u; }
+  };
+  SC.restore = (it) => (it.kind === 'text' ? SC.setText(it, it.origHTML) : SC.setImg(it, it.orig));
+  SC.applyTheme = (json) => {
+    const st = document.documentElement.style;
+    for (const k in THEME) st.removeProperty(k);
+    let t = {}; try { t = JSON.parse(json || '{}'); } catch (e) {}
+    for (const [k, v] of Object.entries(t)) if (THEME[k] && /^#[0-9a-f]{6}$/i.test(v)) st.setProperty(k, v);
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t['--lime'] || THEME['--lime'][1];
+  };
+  SC.apply = (rows) => {
+    for (const it of SC.applied.keys()) SC.restore(it);
+    SC.applied.clear();
+    let theme = null;
+    for (const r of rows || []) {
+      if (r.kind === 'theme') { theme = r.value; continue; }
+      if (r.page !== here && r.page !== '*') continue;
+      const same = (it) => it.kind === r.kind && it.scope === r.scope && it.orig === r.orig && !SC.applied.has(it);
+      const it = SC.items.find((i) => same(i) && i.path === r.path) || SC.items.find(same);
+      if (!it) continue;
+      if (r.kind === 'text') SC.setText(it, sanitize(r.value)); else SC.setImg(it, r.value);
+      SC.applied.set(it, r);
+    }
+    SC.applyTheme(theme);
+  };
+  const CK = 'cpsc-site:' + (SC.editable ? here : '_');
+  SC.load = async () => {
+    if (!sb) return;
+    const pages = [here, '*'];
+    const { data, error } = await sb.from('site_content').select('key,kind,page,scope,path,orig,value').in('page', pages);
+    if (error || !data) return;
+    SC.rows = data;
+    try { localStorage.setItem(CK, JSON.stringify(data)); } catch (e) {}
+    SC.apply(data);
+  };
+  SC.items = collect();
+  try { SC.apply(JSON.parse(localStorage.getItem(CK) || '[]')); } catch (e) {}   // last known edits right away, no flash
+  SC.ready = SC.load().catch(() => {});
 
   window.$ = (s) => document.querySelector(s);
   window.esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

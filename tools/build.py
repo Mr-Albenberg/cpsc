@@ -61,12 +61,14 @@ boot('guest').then(() => {
     e.preventDefault(); $('#go').disabled = true;
     const id = $('#email').value.trim();
     const email = id.includes('@') ? id : id.toLowerCase() + '@example.com';   // demo usernames (admin, member1…)
-    const { error } = await sb.auth.signInWithPassword({ email, password: $('#password').value });
+    const { data: auth, error } = await sb.auth.signInWithPassword({ email, password: $('#password').value });
     if (error) {
       $('#go').disabled = false;
       return showMsg($('#msg'), /confirm/i.test(error.message) ? 'Confirm your email first — check your inbox for the link.' : 'Wrong email/username or password.');
     }
-    location.href = nextPage();
+    const { data: me } = await sb.from('profiles').select('is_admin').eq('id', auth.user.id).maybeSingle();
+    setRole(me?.is_admin ? 'admin' : 'member');
+    location.href = nextPage(me?.is_admin);   // admins go straight to the scanner
   };
   $('#forgot').onclick = async () => {
     const email = $('#email').value.trim();

@@ -41,7 +41,7 @@ def club(fname, title, body, script=''):
         # The site root: Home for visitors, straight to your card if you're logged in
         page('index.html', title, ROOT_REDIRECT, body, CLUB_JS + script, main_class='club', suffix='Central Pacific Ski Club')
 
-ROOT_REDIRECT = '''<script>try { if (Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k) && localStorage.getItem(k))) location.replace('card.html'); } catch (e) {}</script>'''
+ROOT_REDIRECT = '''<script>try { if (Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k) && localStorage.getItem(k))) location.replace(localStorage.getItem('cpsc-role') === 'admin' ? 'scan.html' : 'card.html'); } catch (e) {}</script>'''
 
 def band(words):
     seq = ''.join(f'<span>{w}</span>' for w in words)
@@ -360,18 +360,19 @@ page('exec-board.html', 'Exec Board', '', '''
   <div class="kicker">Members only · 2026/2027</div>
   <h1 class="big" style="color:#fff;font-size:clamp(3.2rem,10vw,6rem)">Get to know your <span style="color:var(--lime)">exec board</span></h1>
   <p class="lead">Ten people running the best events and membership experience in SLO. Tap a photo to see it big.</p>
-  <nav class="chips" id="jump" aria-label="Board members"></nav>
+  <nav class="chips" id="jump" aria-label="Board members" data-noedit></nav>
 </div></section>
-<div class="wrap" id="importBox" hidden>
+<div class="wrap" id="importBox" hidden data-noedit>
   <div class="notice" style="margin-top:24px"><strong>Exec board photos aren’t loaded yet</strong>
   As an admin you can copy them from cpsconline.com into the private members-only storage (one time, about 30 seconds).
   <div class="btn-row" style="margin-top:10px"><button class="btn" id="importBtn" type="button">Import photos</button><span class="muted" id="importMsg"></span></div></div>
 </div>
-<section class="sec"><div class="wrap" id="board"><p class="muted center">Loading the board…</p></div></section>
+<section class="sec"><div class="wrap" id="board" data-noedit><p class="muted center">Loading the board…</p></div></section>
 <div class="lightbox" id="lightbox" hidden tabindex="-1" role="dialog" aria-label="Photo"><img alt=""></div>
 ''', r'''
 boot('member').then(async ({ profile }) => {
   const { data: rows, error } = await sb.from('exec_board').select('*').order('sort');
+  window.execBoard = { rows: rows || [] };   // the admin editor saves changes back to these rows
   if (error || !rows?.length) { $('#board').innerHTML = '<p class="muted center">Couldn’t load the exec board right now.</p>'; return; }
   const paths = rows.flatMap((r) => r.photos);
   const { data: signed } = await sb.storage.from('club').createSignedUrls(paths, 3600);
@@ -379,14 +380,14 @@ boot('member').then(async ({ profile }) => {
   const missing = paths.filter((p) => !url[p]).length;
   $('#jump').innerHTML = rows.map((r) => `<a class="chip" href="#m${r.sort}">${esc(r.name)}</a>`).join('');
   $('#board').innerHTML = rows.map((r, i) => `
-    <article class="exec ${i % 2 ? 'flip' : ''}" id="m${r.sort}">
+    <article class="exec ${i % 2 ? 'flip' : ''}" id="m${r.sort}" data-id="${r.id}">
       <div class="exec-photos">${r.photos.map((p, j) => url[p]
-        ? `<button type="button" aria-label="${esc(r.name)} photo ${j + 1}"><img src="${url[p]}" alt="${esc(r.name)}, ${esc(r.role)}" loading="lazy"></button>`
-        : `<div class="ph" aria-hidden="true">${esc(r.name[0])}</div>`).join('')}</div>
+        ? `<button type="button" data-photo="${j}" aria-label="${esc(r.name)} photo ${j + 1}"><img src="${url[p]}" alt="${esc(r.name)}, ${esc(r.role)}" loading="lazy"></button>`
+        : `<div class="ph" data-photo="${j}" aria-hidden="true">${esc(r.name[0])}</div>`).join('')}</div>
       <div class="exec-text">
-        <div class="kicker">${esc(r.role)}</div>
-        <h2>${esc(r.name)} <span>aka “${esc(r.nickname || '')}”</span></h2>
-        <p>${esc(r.bio || '')}</p>
+        <div class="kicker" data-db="role">${esc(r.role)}</div>
+        <h2><i data-db="name">${esc(r.name)}</i> <span>aka “<i data-db="nickname">${esc(r.nickname || '')}</i>”</span></h2>
+        <p data-db="bio">${esc(r.bio || '')}</p>
       </div>
     </article>`).join('');
   const lb = $('#lightbox'), big = lb.querySelector('img');
