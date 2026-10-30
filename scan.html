@@ -7,9 +7,14 @@
 <main>
 <div class="scanner">
   <div class="code-chip" id="scanCode">Check-in code: …</div>
+  <div class="lookup">
+    <label for="q" class="sr">Find a member by name or email</label>
+    <input id="q" type="search" placeholder="Search name or email…" autocomplete="off" enterkeyhint="search">
+    <ul class="lookup-list" id="results" hidden></ul>
+  </div>
   <div class="panel" style="padding:14px">
     <div id="reader"></div>
-    <div class="center" style="margin-top:12px"><button class="btn" id="start" type="button">Start camera</button></div>
+    <div class="center" id="startWrap" style="margin-top:12px" hidden><p class="hint" id="camMsg" style="margin:0 0 10px"></p><button class="btn" id="start" type="button">Start camera</button></div>
     <p class="hint center" id="ready" hidden>Ready — hold a pass in front of the camera.</p>
     <div class="sound-test"><span>Gate sounds:</span><button class="btn ghost" type="button" id="sGood">▶ Valid</button><button class="btn ghost" type="button" id="sBad">▶ Rejected</button></div>
     <details class="manual"><summary>No camera? Upload a photo of the QR code</summary>
@@ -42,6 +47,7 @@
     <div class="sheet-actions">
       <button class="btn ghost" id="shBack" type="button">Back</button>
       <button class="btn dark" id="shNext" type="button">Scan next</button>
+      <button class="btn dark" id="shCheck" type="button" hidden>Check in</button>
     </div>
   </div>
 </div>
@@ -129,7 +135,7 @@ boot('admin').then(() => {
   document.addEventListener('pointerdown', () => loadSounds(), { once: true });
   window.testSound = beep;
   const row = (k, v) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
-  const ICON = { ok: '✓', warn: '!', bad: '✕' };
+  const ICON = { ok: '✓', warn: '!', bad: '✕', look: '⌕' };
 
   function show(state, title, sub, m, photo) {
     last = { state, title, sub, m, photo };
@@ -165,8 +171,12 @@ boot('admin').then(() => {
       row('Check-ins', r.totalScans + ' total' + (r.scansLast24h ? ` · ${r.scansLast24h + 1} in the last 24 h` : '')) +
       row('Role', m.isAdmin ? 'Exec board / admin' : 'Member');
     $('#shCode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> in the top corner, a live ticking clock on the website card, and match this photo.' : 'Make sure the photo matches the person.';
+    const look = state === 'look';
+    $('#shBack').hidden = look; $('#shNext').textContent = look ? 'Close' : 'Scan next'; $('#shNext').className = 'btn ' + (look ? 'ghost' : 'dark');
+    $('#shCheck').hidden = !look;
     $('#overlay').hidden = true;
     $('#sheet').hidden = false;
+    document.body.classList.add('no-scroll');
   }
 
   function bad(text) { show('bad', 'Not valid', text); beep(false); }
@@ -196,7 +206,7 @@ boot('admin').then(() => {
   $('#shNext').onclick = next;
   $('#shBack').onclick = () => { $('#sheet').hidden = true; $('#overlay').hidden = false; };
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('#sheet').hidden) $('#shBack').click();
+    if (e.key === 'Escape' && !$('#sheet').hidden) (last?.state === 'look' ? next() : $('#shBack').click());
     else if ((e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') && !$('#overlay').hidden) { e.preventDefault(); next(); }
   });
 
@@ -208,12 +218,67 @@ boot('admin').then(() => {
   };
   $('#sGood').onclick = () => beep(true);
   $('#sBad').onclick = () => beep(false);
-  $('#start').onclick = async () => {
+  // Camera starts by itself; the button only shows if the browser blocked it
+  async function startCamera() {
     audio(); loadSounds();
+    const slow = setTimeout(() => { if ($('#ready').hidden) { $('#startWrap').hidden = false; $('#camMsg').textContent = 'Waiting for the camera… if nothing happens, allow camera access and tap Start camera.'; } }, 6000);
     try {
       await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } }, onScan);
-      $('#start').style.display = 'none'; $('#ready').hidden = false;
-    } catch (e) { alert('Could not open the camera: ' + e + '\nAllow camera access for this site and try again.'); }
+      clearTimeout(slow); $('#startWrap').hidden = true; $('#ready').hidden = false;
+    } catch (e) {
+      clearTimeout(slow);
+      $('#startWrap').hidden = false;
+      $('#camMsg').textContent = /NotAllowed|Permission/i.test(String(e)) ? 'Camera access is blocked — allow it for this site, then tap Start camera.' : 'Tap to start the camera.';
+    }
+  }
+  $('#start').onclick = startCamera;
+  startCamera();
+
+  // Look up a member by name or email
+  let members = null;
+  const loadMembers = async () => {
+    if (members) return members;
+    const [{ data: profs }, { data: stats }] = await Promise.all([
+      sb.from('profiles').select('id,name,email,is_admin,serial,member_no,created_at'),
+      sb.rpc('admin_members'),
+    ]);
+    const st = Object.fromEntries((stats || []).map((s) => [s.id, s]));
+    members = (profs || []).map((p) => ({ ...p, last_scan: st[p.id]?.last_scan || null, scan_count: st[p.id]?.scan_count || 0 }));
+    return members;
+  };
+  const norm = (s) => (s || '').toLowerCase();
+  let qTimer;
+  $('#q').addEventListener('focus', loadMembers, { once: true });
+  $('#q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(search, 120); };
+  async function search() {
+    const q = norm($('#q').value.trim()), list = $('#results');
+    if (!q) { list.hidden = true; return; }
+    const all = await loadMembers();
+    const hits = all.filter((m) => norm(m.name).includes(q) || norm(m.email).includes(q)).slice(0, 8);
+    list.hidden = false;
+    list.innerHTML = hits.length ? hits.map((m) => `<li><button type="button" data-id="${m.id}">
+        <strong>${esc(m.name)}</strong><span>${esc(m.email)}${m.member_no ? ' · #' + String(m.member_no).padStart(4, '0') : ''}</span>
+        <em>${m.last_scan ? 'Last in ' + esc(fmtTime(m.last_scan)) : 'Never checked in'}</em></button></li>`).join('')
+      : '<li class="none">No member matches “' + esc($('#q').value.trim()) + '”</li>';
+    list.querySelectorAll('button').forEach((b) => b.onclick = () => lookup(all.find((m) => m.id === b.dataset.id)));
+  }
+  let looked = null;
+  async function lookup(p) {
+    looked = p;
+    const m = { id: p.id, name: p.name, email: p.email, isAdmin: p.is_admin, memberNo: p.member_no, since: p.created_at };
+    const photo = await signedPhoto(p.id).catch(() => null);
+    const day = p.last_scan && Date.now() - Date.parse(p.last_scan) < 864e5;
+    last = { state: 'look', title: day ? 'Member · already in today' : 'Member lookup', m, photo,
+      r: { lastScan: p.last_scan, lastScannedBy: null, totalScans: p.scan_count, scansLast24h: 0 } };
+    busy = true; try { scanner.pause(true); } catch {}
+    openInfo();
+  }
+  // "Check in" from a lookup records it exactly like scanning their pass (same sounds and screen)
+  $('#shCheck').onclick = () => {
+    const p = looked; if (!p) return;
+    $('#sheet').hidden = true; busy = false; members = null;
+    $('#q').value = ''; $('#results').hidden = true;
+    onScan('CPSC1:' + p.serial);
   };
 }).catch(() => {});
 </script>
