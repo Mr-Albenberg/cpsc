@@ -2,7 +2,7 @@
 
 Digital membership cards for Central Pacific Ski Club. Members sign up (approved emails only), get a card with their photo and a QR code, and add it to Apple Wallet or Google Wallet. Exec board admins scan the QR to see the member's photo, name and when they were last scanned.
 
-- **Website:** static pages hosted free on **GitHub Pages** (this repo).
+- **Website:** static pages hosted free on **Vercel** at **https://cpsconline.vercel.app** (deploys on every push; settings in `vercel.json`) and on **GitHub Pages** at https://mr-albenberg.github.io/cpsc/.
 - **Accounts, photos, scan history:** a free **Supabase** project.
 - **Wallet passes:** a small Supabase function (`supabase/functions/wallet`) that signs passes with keys stored only in Supabase.
 
