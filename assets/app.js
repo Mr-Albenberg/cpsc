@@ -55,7 +55,7 @@
   function maybeEditor(isAdmin) {
     if (!isAdmin || editorLoaded || !SC.editable) return;
     editorLoaded = true;
-    const s = document.createElement('script'); s.src = 'assets/editor.js?v=1'; document.body.appendChild(s);
+    const s = document.createElement('script'); s.src = 'assets/editor.js?v=2'; document.body.appendChild(s);
   }
 
   // need: 'guest' | 'member' | 'admin' | 'any' | 'public'
@@ -144,9 +144,14 @@
     '--ink': ['Text', '#111111'],
     '--lime-deep': ['Accent, deeper', '#d7f27a'],
   };
+  // Fonts admins can pick (Google Fonts). First one is the original.
+  const FONTS = {
+    head: ['Bebas Neue', 'Anton', 'Oswald', 'Archivo Black', 'Bungee', 'Teko', 'Russo One'],
+    body: ['Questrial', 'Inter', 'DM Sans', 'Nunito', 'Work Sans', 'Space Grotesk', 'Lora'],
+  };
   const INLINE = new Set(['B', 'STRONG', 'EM', 'I', 'U', 'SPAN', 'A', 'BR', 'SMALL', 'MARK', 'SUP', 'SUB']);
   const SITE_IMG = CFG.supabaseUrl ? CFG.supabaseUrl.replace(/\/$/, '') + '/storage/v1/object/public/site/' : '//none/';
-  const norm = (s) => String(s ?? '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = (s) => String(s ?? '').replace(/\u00a0|&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
   // Only harmless inline formatting survives: bold/italic/links/line breaks, no scripts or styles
   function sanitize(html) {
@@ -171,7 +176,7 @@
   }
   const safeImg = (v) => (typeof v === 'string' && !/["'()\\\s]/.test(v) && (v.startsWith(SITE_IMG) || /^img\/[\w\/.-]+$/.test(v)) ? v : null);
 
-  const SC = window.siteContent = { page: here, EDITABLE, THEME, sanitize, safeImg, norm, SITE_IMG, items: [], rows: [], applied: new Map(),
+  const SC = window.siteContent = { page: here, EDITABLE, THEME, FONTS, sanitize, safeImg, norm, SITE_IMG, items: [], rows: [], applied: new Map(),
     editable: EDITABLE.includes(here) };
 
   function pathOf(root, el) { const p = []; while (el && el !== root) { p.unshift([...el.parentNode.children].indexOf(el)); el = el.parentNode; } return p.join('.'); }
@@ -195,6 +200,9 @@
       const walk = (el) => {
         if (el.hasAttribute('data-noedit') || el.matches('.lightbox, script, style, svg, input, textarea, select, form, .links')) return;
         const base = { scope, page, el, path: pathOf(root, el) };
+        if (scope === 'main' && el.parentElement === root) { // whole sections, so admins can hide them
+          items.push({ ...base, kind: 'block', orig: norm(el.textContent).slice(0, 80) || (el.querySelector('img')?.getAttribute('src') || '') });
+        }
         if (el.tagName === 'IMG') { const o = el.getAttribute('src'); if (o) items.push({ ...base, kind: 'img', orig: o }); return; }
         if (el !== root && el.style.backgroundImage) { const o = bgUrl(el); if (o) items.push({ ...base, kind: 'img', bg: true, orig: o }); }
         if (el !== root && isTextBlock(el)) {
@@ -210,6 +218,7 @@
     return items;
   }
 
+  SC.linkOf = (it) => { const a = it.el.closest('a'); return a && (it.scope === 'main' ? a.closest('main') : a.closest('.site-footer')) ? a : null; };
   SC.keyOf = (it) => `${it.kind}:${it.page}:${it.scope}:${it.path}`;
   SC.setText = (it, html) => { it.el.innerHTML = html; const t = twin(it.el); if (t) t.innerHTML = html; };
   SC.setImg = (it, url) => {
@@ -217,18 +226,59 @@
     if (it.bg) it.el.style.backgroundImage = `url("${u}")`; else { it.el.removeAttribute('srcset'); it.el.src = u; }
   };
   SC.restore = (it) => (it.kind === 'text' ? SC.setText(it, it.origHTML) : SC.setImg(it, it.orig));
+  const fontLink = (name, body) => {
+    const id = 'gf-' + name.replace(/\W/g, '');
+    if (document.getElementById(id)) return;
+    const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=' + name.replace(/ /g, '+') + (body ? ':wght@400;700' : '') + '&display=swap';
+    document.head.appendChild(l);
+  };
   SC.applyTheme = (json) => {
     const st = document.documentElement.style;
     for (const k in THEME) st.removeProperty(k);
+    st.removeProperty('--font-head'); st.removeProperty('--font-body');
     let t = {}; try { t = JSON.parse(json || '{}'); } catch (e) {}
     for (const [k, v] of Object.entries(t)) if (THEME[k] && /^#[0-9a-f]{6}$/i.test(v)) st.setProperty(k, v);
+    if (FONTS.head.includes(t['font-head']) && t['font-head'] !== FONTS.head[0]) { fontLink(t['font-head']); st.setProperty('--font-head', `"${t['font-head']}", "Arial Narrow", sans-serif`); }
+    if (FONTS.body.includes(t['font-body']) && t['font-body'] !== FONTS.body[0]) { fontLink(t['font-body'], true); st.setProperty('--font-body', `"${t['font-body']}", system-ui, sans-serif`); }
     const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t['--lime'] || THEME['--lime'][1];
+  };
+  // Per-page look settings (text size, alignment, button links, photo descriptions, hidden sections).
+  // Stored as one row per page: { list: [{ k: kind, s: scope, p: path, o: orig, size, align, href, alt, hide }] }
+  const okHref = (v) => typeof v === 'string' && /^(https?:\/\/[^\s"'<>]+|mailto:[^\s"'<>]+|tel:[+\d\s()-]+|#[\w-]*|[\w-]+\.html(#[\w-]*)?)$/i.test(v);
+  SC.okHref = okHref;
+  const touched = new Set();
+  SC.findItem = (kind, scope, path, orig, taken) => {
+    const same = (it) => it.kind === kind && it.scope === scope && it.orig === orig && !(taken && taken.has(it));
+    return SC.items.find((i) => same(i) && i.path === path) || SC.items.find(same);
+  };
+  SC.applySettings = (json) => {
+    for (const it of touched) {
+      it.el.classList.remove('ed-hidden'); it.el.style.zoom = ''; it.el.style.textAlign = '';
+      const a = SC.linkOf(it); if (a && it.origHref !== undefined) a.setAttribute('href', it.origHref);
+      if (it.origAlt !== undefined) it.el.setAttribute('alt', it.origAlt);
+    }
+    touched.clear();
+    let cfg = {}; try { cfg = JSON.parse(json || '{}'); } catch (e) {}
+    const map = new Map();
+    for (const e of cfg.list || []) {
+      const it = SC.findItem(e.k, e.s, e.p, e.o); if (!it) continue;
+      map.set(it, e); touched.add(it);
+      if (e.hide) it.el.classList.add('ed-hidden');
+      if (e.size && e.size >= 0.6 && e.size <= 2) it.el.style.zoom = e.size;
+      if (['left', 'center', 'right'].includes(e.align)) it.el.style.textAlign = e.align;
+      const a = SC.linkOf(it);
+      if (a && okHref(e.href)) { if (it.origHref === undefined) it.origHref = a.getAttribute('href'); a.setAttribute('href', e.href); }
+      if (it.el.tagName === 'IMG' && typeof e.alt === 'string') { if (it.origAlt === undefined) it.origAlt = it.el.getAttribute('alt') || ''; it.el.setAttribute('alt', e.alt.slice(0, 300)); }
+    }
+    SC.settingsMap = map;
   };
   SC.apply = (rows) => {
     for (const it of SC.applied.keys()) SC.restore(it);
     SC.applied.clear();
-    let theme = null;
+    let theme = null, settings = null;
     for (const r of rows || []) {
+      if (r.kind === 'theme' && r.scope === 'page') { if (r.page === here) settings = r.value; continue; }
       if (r.kind === 'theme') { theme = r.value; continue; }
       if (r.page !== here && r.page !== '*') continue;
       const same = (it) => it.kind === r.kind && it.scope === r.scope && it.orig === r.orig && !SC.applied.has(it);
@@ -238,6 +288,7 @@
       SC.applied.set(it, r);
     }
     SC.applyTheme(theme);
+    SC.applySettings(settings);
   };
   const CK = 'cpsc-site:' + (SC.editable ? here : '_');
   SC.load = async () => {
