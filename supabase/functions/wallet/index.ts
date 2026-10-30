@@ -665,7 +665,7 @@ export async function googleSaveUrl(p: Profile) {
     iss: c.client_email,
     aud: 'google',
     typ: 'savetowallet',
-    origins: [new URL(SITE_URL).origin],
+    origins: [...new Set([new URL(SITE_URL).origin, 'https://cpsconline.vercel.app', ...env('EXTRA_ORIGINS').split(',').filter(Boolean)])],
     payload: { genericObjects: [{ id: gObjectId(p), classId: gClassId() }] },
   }).setProtectedHeader({ alg: 'RS256', typ: 'JWT' }).setIssuedAt().sign(await importPKCS8(c.private_key, 'RS256'));
   return `https://pay.google.com/gp/v/save/${jwt}`;
