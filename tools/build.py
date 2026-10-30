@@ -3,7 +3,8 @@ HEAD = '''<meta charset="utf-8"><meta name="viewport" content="width=device-widt
 <link rel="stylesheet" href="assets/style.css"><link rel="icon" href="img/icon.png"><link rel="apple-touch-icon" href="img/apple-touch-icon.png">'''
 SCRIPTS = '''<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="assets/app.js"></script>'''
+<script src="assets/app.js"></script>
+<script src="assets/fx.js" defer></script>'''
 FOOT = '''<footer class="site-footer">
   <img src="img/logo-white.png" alt="CPSC">
   <div class="tag">Live to ski, love to party</div>

@@ -129,3 +129,11 @@ Without this, Android passes come from WalletWallet's free plan, which can't sho
 6. In the Pay & Wallet Console, **Google Wallet API → Manage → Request publishing access** (Google reviews it, usually a few days). Until then only accounts listed under **Users / test users** can save passes, and they're marked "test".
 
 Members who already added the WalletWallet version get the new pass by tapping **Add to Google Wallet** again; the old one is voided automatically.
+
+## Save points
+`save-point-2026-10-30` (a branch on GitHub) is the site exactly as it was before the futuristic design pass. To go back to it:
+`git checkout main && git reset --hard origin/save-point-2026-10-30 && git push --force-with-lease origin main`
+(or in Vercel, open Deployments and "Promote" / "Instant Rollback" to the deployment from that commit).
+
+## Editing pages
+The HTML pages are generated: edit `tools/build.py` (app pages) or `tools/club.py` (club pages), then run `python3 tools/build.py` from the repo root. Effects live in `assets/fx.js` and the "FX" section at the bottom of `assets/style.css`.
