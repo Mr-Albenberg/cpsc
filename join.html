@@ -30,16 +30,39 @@
     <div class="card">
       <div class="tag">How to join</div>
       <ol class="steps">
-        <li><span>1</span><div><strong>Pay the membership fee</strong><br>Fill out the form and pay on cpsconline.com.</div></li>
-        <li><span>2</span><div><strong>Get approved</strong><br>The exec board adds your email to the member list.</div></li>
+        <li><span>1</span><div><strong>Pay your dues online</strong><br>Card, Apple Pay or Google Pay — right below.</div></li>
+        <li><span>2</span><div><strong>You’re approved instantly</strong><br>Paying adds your email to the member list.</div></li>
         <li><span>3</span><div><strong>Create your account</strong><br>Sign up here with that email and add a photo.</div></li>
         <li><span>4</span><div><strong>Add your card to your wallet</strong><br>Show the QR at the door to check in.</div></li>
       </ol>
-      <div class="btn-row"><a class="btn lg" href="https://cpsconline.com/join/" target="_blank" rel="noopener">Pay &amp; join ↗</a><a class="btn ghost lg" href="signup.html">Create account</a></div>
+      <div class="btn-row"><a class="btn lg" href="#pay">Pay &amp; join</a><a class="btn ghost lg" href="signup.html">Create account</a></div>
     </div>
   </div>
   <p class="fine" style="margin-top:36px">*Please note that membership fees are not refundable. You are responsible for attending events and getting the most out of your membership.<br>
   *If you are paying our spring membership fee ($25.69), please note our membership resets before fall. If you wish to still be a member the following fall, you must pay for the full-priced, full-year membership when it is reset.</p>
+</div></section>
+<section class="sec dark pay-sec" id="pay" data-noedit><div class="wrap">
+  <div class="kicker">Pay online</div>
+  <h2 class="big" style="color:#fff">Pay your <span style="color:var(--lime)">dues</span></h2>
+  <p class="lead" id="payLead">Card, Apple Pay or Google Pay. You’re approved the moment it goes through — then create your account and add your card to your wallet.</p>
+  <div class="pay-done" id="payDone" hidden aria-live="polite"></div>
+  <form class="pay-form" id="payForm" novalidate>
+    <fieldset class="plans"><legend class="sr">Membership</legend>
+      <label class="plan"><input type="radio" name="plan" value="new" checked><span><b>New member</b><em data-price="new">$55.69</em><small>Full school year</small></span></label>
+      <label class="plan"><input type="radio" name="plan" value="returning"><span><b>Returning member</b><em data-price="returning">$50.69</em><small>Full school year</small></span></label>
+      <label class="plan" id="springPlan"><input type="radio" name="plan" value="spring"><span><b>Spring</b><em data-price="spring">$25.69</em><small>Spring semester</small></span></label>
+    </fieldset>
+    <div class="pay-fields">
+      <div><label for="payName">Full name</label><input id="payName" type="text" autocomplete="name" required maxlength="80"></div>
+      <div><label for="payEmail">Email</label><input id="payEmail" type="email" autocomplete="email" required spellcheck="false" autocapitalize="none"></div>
+    </div>
+    <p class="fine" id="payUntil">Every membership is valid through June 30, the end of the school year.</p>
+    <button class="btn lime lg block" type="submit" id="payBtn">Pay $55.69</button>
+    <div class="msg" id="payMsg"></div>
+    <p class="fine">Payments are handled by Stripe — your card details never touch this site. Use the email you’ll sign up with (returning members: the one you joined with before).</p>
+  </form>
+  <div class="pay-off" id="payOff" hidden><p class="lead">Online payment is coming soon. For now, pay on cpsconline.com and an exec board member will approve you.</p>
+    <a class="btn lime lg" href="https://cpsconline.com/join/" target="_blank" rel="noopener">Pay on cpsconline.com ↗</a></div>
 </div></section>
 
 </main>
@@ -78,5 +101,76 @@ if (lb) {
 document.querySelectorAll('[data-ends]').forEach((el) => {
   if (Date.now() > Date.parse(el.dataset.ends)) el.classList.add('is-past');
 });
+
+// ----- Paying dues online (Stripe Checkout) -----
+(async () => {
+  const form = $('#payForm'); if (!form || !window.FN_URL) return;
+  const qs = new URLSearchParams(location.search);
+  const plan = () => form.querySelector('input[name=plan]:checked')?.value;
+  let info = null;
+  const upd = () => { if (info?.prices) $('#payBtn').textContent = 'Pay ' + money(info.prices[plan()]); };
+  const pick = (v) => { const r = form.querySelector(`input[value="${v}"]`); if (r && !r.disabled) { r.checked = true; upd(); } };
+  form.addEventListener('change', upd);
+  try { info = await (await fetch(FN_URL + '?prices=1')).json(); } catch (e) {}
+  const sid = qs.get('paid');
+  if (!info?.ready && !sid) { form.hidden = true; $('#payLead').hidden = true; $('#payOff').hidden = false; return; }
+  if (info?.prices) {
+    for (const k of ['new', 'returning', 'spring']) form.querySelector(`[data-price="${k}"]`).textContent = money(info.prices[k]);
+    $('#payUntil').textContent = `Every membership is valid through ${info.until} — the end of the school year.`;
+    if (!info.springOpen) {
+      const sp = $('#springPlan'); sp.classList.add('off'); sp.querySelector('input').disabled = true;
+      sp.querySelector('small').textContent = 'Sold January–May';
+    }
+    upd();
+  }
+  // Logged in? Fill in their details and assume they're renewing
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      const { data: p } = await sb.from('profiles').select('name,email').eq('id', session.user.id).maybeSingle();
+      if (p) { $('#payName').value = p.name; $('#payEmail').value = p.email; pick('returning'); }
+    }
+  } catch (e) {}
+  if (qs.has('renew')) pick('returning');
+  if (qs.has('canceled')) showMsg($('#payMsg'), 'Payment canceled — nothing was charged.');
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const name = $('#payName').value.trim(), email = $('#payEmail').value.trim();
+    if (name.length < 2) return showMsg($('#payMsg'), 'Type your full name.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showMsg($('#payMsg'), 'Type a valid email.');
+    $('#payBtn').disabled = true; $('#payBtn').textContent = 'Opening secure checkout…'; $('#payMsg').className = 'msg';
+    try {
+      const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'checkout', plan: plan(), name, email, returnUrl: location.href.split(/[?#]/)[0] }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.url) throw new Error(d.error || 'Couldn’t start checkout. Try again in a minute.');
+      location.href = d.url;
+    } catch (err) { showMsg($('#payMsg'), err.message); $('#payBtn').disabled = false; upd(); }
+  };
+
+  // Back from Stripe: confirm the payment and show the next step
+  if (sid) {
+    const done = $('#payDone');
+    form.hidden = true; done.hidden = false; done.innerHTML = '<p class="lead">Confirming your payment…</p>';
+    document.getElementById('pay').scrollIntoView();
+    let d = null;
+    for (let i = 0; i < 6 && !d?.paid; i++) {
+      if (i) await new Promise((r) => setTimeout(r, 1500));
+      try { const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'checkout-status', session: sid }) }); d = await r.json(); } catch (e) {}
+    }
+    if (d?.paid) {
+      const first = esc((d.name || '').split(' ')[0] || 'friend');
+      done.innerHTML = `<div class="pay-ok" aria-hidden="true">✓</div><h3>You’re in, ${first}!</h3>
+        <p class="lead">Your membership is paid and valid through <b>${esc(d.until)}</b>.</p>` + (d.hasAccount
+        ? `<a class="btn lime lg" href="card.html?renewed=1">See my card</a><p class="fine">Your wallet card updates on its own — no need to re-add it.</p>`
+        : `<p>Last step: create your account with <b>${esc(d.email)}</b> to get your membership card.</p>
+           <a class="btn lime lg" href="signup.html?email=${encodeURIComponent(d.email)}&name=${encodeURIComponent(d.name || '')}">Create my account</a>`);
+      history.replaceState(null, '', location.pathname + '#pay');
+    } else {
+      done.innerHTML = '<p class="lead">We couldn’t confirm your payment yet. If you were charged, refresh this page in a minute — or show your Stripe receipt to the exec board.</p>';
+    }
+  }
+})();
 </script>
 </body></html>

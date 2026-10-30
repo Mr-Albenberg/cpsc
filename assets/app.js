@@ -304,6 +304,16 @@
   try { SC.apply(JSON.parse(localStorage.getItem(CK) || '[]')); } catch (e) {}   // last known edits right away, no flash
   SC.ready = SC.load().catch(() => {});
 
+  // Memberships run through June 30 of the school year (dates are club time, Pacific)
+  window.clubToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+  window.memberActive = (until) => until == null || until >= clubToday(); // no date yet (before the membership update) = still active
+  window.fmtDay = (d, long) => (d ? new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: long ? 'long' : 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '—');
+  window.seasonEnd = () => { const [y, m] = clubToday().split('-').map(Number); return `${y + (m >= 6 ? 1 : 0)}-06-30`; }; // June 1 starts next year
+  window.planName = (t) => (t === 'spring' ? 'Spring' : 'Full year');
+  window.membershipText = (type, until) => (!until ? 'No membership on file'
+    : memberActive(until) ? `${planName(type)} · valid through ${fmtDay(until)}` : `Expired · ended ${fmtDay(until)}`);
+  window.partyName = (w) => String(w || 'Party').toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+  window.money = (cents) => '$' + (cents / 100).toFixed(2);
   window.$ = (s) => document.querySelector(s);
   window.esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   window.showMsg = (el, text, ok) => { el.textContent = text; el.className = 'msg show ' + (ok ? 'ok' : 'err'); };

@@ -96,6 +96,9 @@ page('signup.html', 'Create account',
 </form>''',
  r'''
 boot('guest').then(() => {
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('email')) $('#email').value = qs.get('email');   // coming from paying online
+  if (qs.get('name')) $('#name').value = qs.get('name');
   $('#photo').onchange = (e) => {
     const f = e.target.files[0];
     if (f) { $('#preview').style.backgroundImage = 'url(' + URL.createObjectURL(f) + ')'; $('#preview').style.borderStyle = 'solid'; }
@@ -159,11 +162,14 @@ page('card.html', 'My card',
  hero('Your membership', 'Hey there', 'Add your card to your wallet and show the QR code at events and trips.', 'hi'),
  '''<div class="grid">
   <div class="panel">
+    <div class="notice bad" id="expired" hidden><strong id="expTitle">Your membership has ended</strong><span id="expText"></span>
+      <div class="btn-row" style="margin-top:10px"><a class="btn" id="renewBtn" href="join.html#pay">Renew membership</a></div></div>
     <div class="notice" id="needPhoto" style="display:none"><strong>Add your photo to finish your card</strong>Admins see it when they scan you in. Use "Choose photo" on this page.</div>
     <div class="member-card">
       <div class="top"><img class="card-logo" src="img/logo-white.png" alt="CPSC"><small>MEMBERSHIP CARD</small></div>
       <div class="who"><img id="photo" alt=""><div><div class="label" id="role">MEMBER</div><div class="name" id="name"></div><div class="memno" id="memno"></div></div></div>
-      <div class="qr"><div id="qr"></div></div>
+      <div class="valid-line" id="validLine"></div>
+      <div class="qr"><div id="qr"></div><div class="qr-stamp" aria-hidden="true">Expired</div></div>
       <div class="live-strip" id="live">
         <div class="live-row"><span class="live-dot"></span><span>LIVE</span><span class="live-clock" id="liveClock">--:--:--</span></div>
         <div class="live-code" id="liveCode">…</div>
@@ -191,6 +197,7 @@ page('card.html', 'My card',
   <div class="panel">
     <h2>Profile</h2>
     <p class="muted" id="email"></p>
+    <div class="plan-box" id="planBox"></div>
     <label>Photo</label>
     <div class="photo-pick"><label for="newphoto" class="btn ghost small" style="margin:0">Choose photo</label><input type="file" id="newphoto" accept="image/*"></div>
     <div class="msg" id="msg"></div>
@@ -289,6 +296,18 @@ boot('member').then(async (ctx) => {
   const yr = new Date(p.created_at).getFullYear();
   if (p.member_no) $('#memno').textContent = 'MEMBER #' + String(p.member_no).padStart(4, '0') + (yr ? ' · SINCE ' + yr : '');
   new QRCode($('#qr'), { text: 'CPSC1:' + p.serial, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+  // Membership: valid through June 30 of the school year
+  const active = memberActive(p.member_until);
+  $('#validLine').textContent = p.member_until ? (active ? `${planName(p.membership)} · valid thru ${fmtDay(p.member_until)}` : `Expired ${fmtDay(p.member_until)}`) : '';
+  document.querySelector('.member-card').classList.toggle('expired', !active);
+  $('#planBox').hidden = !p.member_until;
+  $('#planBox').innerHTML = `<b>${esc(planName(p.membership))} membership</b><span>${esc(membershipText(p.membership, p.member_until))}</span>`;
+  if (!active) {
+    $('#expired').hidden = false;
+    $('#expText').textContent = p.member_until ? `It ended ${fmtDay(p.member_until, true)}, so your card won’t check you in until you renew. Renewing keeps the same card — no need to re-add it to your wallet.` : 'Your card won’t check you in until you have a membership.';
+    $('#renewBtn').href = 'join.html?renew=1#pay';
+  }
+  if (new URLSearchParams(location.search).has('renewed')) showMsg($('#wmsg'), `You’re renewed through ${fmtDay(p.member_until, true)}. Your wallet card updates on its own.`, true);
   loadPhoto();
 
   const ua = navigator.userAgent;
@@ -355,12 +374,35 @@ page('admin.html', 'Members',
     </form>
   </div>
   <div class="grid">
+    <div class="panel">
+      <div class="toolbar"><h2 style="margin:0">Parties</h2><span class="pill" id="tonightPill"></span></div>
+      <p class="muted">One party a day, named after that day’s check-in word. Scans from 6am to 6am count toward that night, so a 1am scan still counts.</p>
+      <ul class="event-list" id="events"><li class="none">Loading…</li></ul>
+    </div>
+    <form class="panel" id="pf">
+      <h2>Dues</h2>
+      <p class="muted" id="payState">Checking online payments…</p>
+      <div class="price-inputs">
+        <label for="pNew">New member<span class="money-in"><i>$</i><input id="pNew" inputmode="decimal" autocomplete="off"></span></label>
+        <label for="pRet">Returning<span class="money-in"><i>$</i><input id="pRet" inputmode="decimal" autocomplete="off"></span></label>
+        <label for="pSpr">Spring<span class="money-in"><i>$</i><input id="pSpr" inputmode="decimal" autocomplete="off"></span></label>
+      </div>
+      <button class="btn block" type="submit" id="psave">Save prices</button>
+      <div class="msg" id="pmsg"></div>
+      <h3 class="sub-h">Online payments</h3>
+      <div class="table-wrap" style="max-height:260px;overflow-y:auto"><table><thead><tr><th>Who</th><th>Plan</th><th>When</th></tr></thead><tbody id="payments"></tbody></table></div>
+    </form>
+  </div>
+  <div class="grid">
     <form class="panel" id="af">
       <h2>Approve emails</h2>
-      <p class="muted">Paste one or many — separated by commas, spaces or new lines.</p>
+      <p class="muted">Paste one or many — separated by commas, spaces or new lines. Approving someone already on the list renews them for this school year.</p>
       <textarea id="emails" rows="5" placeholder="jane@calpoly.edu, sam@gmail.com"></textarea>
-      <label for="note">Note (optional)</label><input type="text" id="note" placeholder="e.g. Paid dues Fall 2026">
-      <button class="btn block" type="submit">Approve</button>
+      <label for="plan">Membership</label>
+      <select id="plan" class="field"><option value="full">Full year</option><option value="spring">Spring</option></select>
+      <p class="muted" id="planNote" style="margin:6px 0 0"></p>
+      <label for="note">Note (optional)</label><input type="text" id="note" placeholder="e.g. Paid cash at tabling">
+      <button class="btn block" type="submit" id="asave">Approve</button>
       <div class="msg" id="amsg"></div>
     </form>
     <div class="panel">
@@ -369,7 +411,9 @@ page('admin.html', 'Members',
     </div>
   </div>
   <div class="panel">
-    <div class="toolbar"><h2 style="margin:0">Members <span class="pill" id="count"></span></h2><input type="search" id="mq" placeholder="Search members…"></div>
+    <div class="toolbar"><h2 style="margin:0">Members <span class="pill" id="count"></span></h2>
+      <div class="toolbar-r"><select id="mf" aria-label="Show"><option value="">Everyone</option><option value="active">Active</option><option value="expired">Expired</option><option value="tonight">In tonight</option></select>
+      <input type="search" id="mq" placeholder="Search members…"></div></div>
     <ul class="member-list" id="members"></ul>
   </div>''',
  r'''
@@ -379,25 +423,30 @@ function drawApproved() {
   const q = $('#aq').value.toLowerCase(), reg = registered();
   $('#approved').innerHTML = approved.filter((a) => a.email.includes(q)).map((a) => `<tr>
     <td>${esc(a.email)}${a.note ? `<div class="muted">${esc(a.note)}</div>` : ''}</td>
-    <td>${reg.has(a.email) ? '<span class="pill ok">Signed up</span>' : '<span class="pill">Waiting</span>'}</td>
+    <td>${reg.has(a.email) ? '<span class="pill ok">Signed up</span>' : '<span class="pill">Waiting</span>'}
+      <div class="plan-line ${memberActive(a.member_until) ? '' : 'bad'}">${esc(memberActive(a.member_until) ? planName(a.membership) + ' · thru ' + fmtDay(a.member_until) : 'Expired ' + fmtDay(a.member_until))}${a.paid_at ? ' · paid online' : ''}</div></td>
     <td style="text-align:right"><button class="btn danger small" data-unapprove="${esc(a.email)}">Remove</button></td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">No approved emails yet.</td></tr>';
 }
 function drawMembers() {
-  const q = $('#mq').value.toLowerCase();
-  $('#count').textContent = members.length;
+  const q = $('#mq').value.toLowerCase(), f = $('#mf').value;
+  const active = members.filter((m) => memberActive(m.member_until)).length;
+  $('#count').textContent = active === members.length ? members.length : `${active} active / ${members.length}`;
   const ini = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-  $('#members').innerHTML = members.filter((m) => (m.name + ' ' + m.email).toLowerCase().includes(q)).map((m) => {
-    const today = m.last_scan && Date.now() - Date.parse(m.last_scan) < 864e5;
-    const last = m.last_scan ? (today ? 'In today' : fmtTime(m.last_scan).split(' · ').pop()) : 'Never in';
+  const keep = (m) => !f || (f === 'active' ? memberActive(m.member_until) : f === 'expired' ? !memberActive(m.member_until) : m.in_tonight);
+  $('#members').innerHTML = members.filter((m) => keep(m) && (m.name + ' ' + m.email).toLowerCase().includes(q)).map((m) => {
+    const today = m.in_tonight, ok = memberActive(m.member_until);
+    const last = m.last_scan ? (today ? 'In tonight' : fmtTime(m.last_scan).split(' · ').pop()) : 'Never in';
     return `<li>
       <span class="av">${avatars[m.id] ? `<img src="${avatars[m.id]}" alt="">` : esc(ini(m.name))}</span>
       <span class="who"><strong>${esc(m.name)}</strong><small>${esc(m.email)}</small></span>
       <span class="meta">
         <span class="nr">${m.is_admin ? '<i class="role-exec">Admin</i>' : ''}${m.member_no ? `<b>#${String(m.member_no).padStart(4, '0')}</b>` : ''}</span>
-        <i class="st ${today ? 'today' : m.last_scan ? '' : 'new'}" title="${m.last_scan ? esc(fmtTime(m.last_scan)) : ''}">${last} · ${m.scan_count} check-in${m.scan_count == 1 ? '' : 's'}</i>
+        <i class="st ${today ? 'today' : m.last_scan ? '' : 'new'}" title="${m.last_scan ? esc(fmtTime(m.last_scan)) : ''}">${last} · ${m.events_attended || 0} part${m.events_attended == 1 ? 'y' : 'ies'}</i>
+        <i class="st ${ok ? 'plan' : 'expired'}">${esc(ok ? planName(m.membership) + ' · thru ' + fmtDay(m.member_until) : 'Expired ' + fmtDay(m.member_until))}</i>
       </span>
       ${m.id === myId ? '<span class="acts"><span class="muted">You</span></span>' : `<span class="acts">
+        ${ok ? '' : `<button class="btn small" data-renew="${esc(m.email)}" data-name="${esc(m.name)}">Renew</button>`}
         <button class="btn ghost small" data-admin="${m.id}" data-to="${m.is_admin ? 0 : 1}">${m.is_admin ? 'Remove admin' : 'Make admin'}</button>
         <button class="btn danger small" data-del="${m.id}" data-name="${esc(m.name)}">Remove</button></span>`}
     </li>`;
@@ -412,12 +461,50 @@ async function load() {
   const { data: nos } = await sb.from('profiles').select('id,member_no');
   const noOf = Object.fromEntries((nos || []).map((r) => [r.id, r.member_no]));
   members.forEach((x) => { x.member_no = noOf[x.id] ?? x.member_no; });
-  drawApproved(); drawMembers();
+  drawApproved(); drawMembers(); loadEvents(); loadDues();
   if (members.length) {
     const { data } = await sb.storage.from('photos').createSignedUrls(members.map((x) => `${x.id}/thumb.png`), 3600);
     (data || []).forEach((d) => { if (d.signedUrl) avatars[d.path.split('/')[0]] = d.signedUrl; });
     drawMembers();
   }
+}
+// ----- Parties (one per day, named after the check-in word) -----
+async function loadEvents() {
+  const [{ data: evs }, { data: tn }] = await Promise.all([sb.rpc('admin_events'), sb.rpc('tonight')]);
+  if (tn) $('#tonightPill').textContent = `Tonight: ${partyName(tn.name)} · ${tn.count} in`;
+  const dayLbl = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  $('#events').innerHTML = (evs || []).map((e) => `<li><button type="button" class="ev" data-ev="${e.id}" aria-expanded="false">
+      <span class="ev-day">${esc(dayLbl(e.day))}</span><span class="ev-name">${esc(partyName(e.name))} party</span><span class="ev-n"><b>${e.attendees}</b> in</span></button>
+      <ol class="ev-who" id="ev${e.id}" hidden></ol></li>`).join('') || '<li class="none">No parties yet — the first scan of the day starts one.</li>';
+}
+async function toggleEvent(btn) {
+  const list = $('#ev' + btn.dataset.ev), open = list.hidden;
+  list.hidden = !open; btn.setAttribute('aria-expanded', String(open));
+  if (!open || list.dataset.loaded) return;
+  const { data } = await sb.rpc('admin_event_attendees', { p_event: +btn.dataset.ev });
+  list.dataset.loaded = '1';
+  list.innerHTML = (data || []).map((a) => `<li><span>${esc(a.name)}</span><small>${new Date(a.scanned_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${a.scanned_by ? ' · ' + esc(a.scanned_by.split('@')[0]) : ''}</small></li>`).join('') || '<li class="none">Nobody yet.</li>';
+}
+// ----- Dues -----
+async function loadDues() {
+  const [{ data: st }, { data: pays }] = await Promise.all([
+    sb.from('club_settings').select('price_new_cents,price_returning_cents,price_spring_cents').eq('id', 1).maybeSingle(),
+    sb.from('payments').select('*').order('created_at', { ascending: false }).limit(40),
+  ]);
+  if (st && !$('#pf').dataset.dirty) {
+    $('#pNew').value = (st.price_new_cents / 100).toFixed(2); $('#pRet').value = (st.price_returning_cents / 100).toFixed(2); $('#pSpr').value = (st.price_spring_cents / 100).toFixed(2);
+  }
+  const PLAN = { new: 'New', returning: 'Returning', spring: 'Spring' };
+  $('#payments').innerHTML = (pays || []).map((p) => `<tr><td>${esc(p.name || '')}<div class="muted">${esc(p.email)}</div></td>
+    <td>${PLAN[p.plan] || esc(p.plan)} · ${money(p.amount_cents)}</td>
+    <td>${p.status === 'paid' ? esc(fmtTime(p.paid_at).split(' · ').pop()) : '<span class="muted">Started, not paid</span>'}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">No online payments yet.</td></tr>';
+  try {
+    const info = await (await fetch(FN_URL + '?prices=1')).json();
+    $('#payState').innerHTML = info.ready
+      ? `Members pay on the <a href="join.html#pay">Join page</a> and are approved automatically through <b>${esc(info.until)}</b>.`
+      : 'Online payment is <b>off</b> until the club’s Stripe keys are added (see the README). Until then the Join page links to cpsconline.com.';
+  } catch { $('#payState').textContent = 'Couldn’t check online payments right now.'; }
 }
 const CODE_WORDS = ['POWDER', 'BLUEBIRD', 'GNARLY', 'CORDUROY', 'FIRST CHAIR', 'FRESH TRACKS', 'SEND IT', 'APRES', 'FACE SHOT', 'YARD SALE', 'HOT LAPS', 'GONDOLA', 'MOGUL', 'SKI BUM', 'PARK RAT', 'TREE RUN', 'COLD SMOKE', 'SNOWBALL', 'GROOMER', 'FROSTBITE'];
 let passCount = 0;
@@ -436,7 +523,22 @@ async function loadCode() {
 }
 boot('admin').then(({ profile }) => {
   myId = profile.id;
-  $('#aq').oninput = drawApproved; $('#mq').oninput = drawMembers;
+  $('#aq').oninput = drawApproved; $('#mq').oninput = drawMembers; $('#mf').onchange = drawMembers;
+  const planNote = () => { $('#planNote').textContent = `Valid through ${fmtDay(seasonEnd(), true)}.`; };
+  planNote();
+  $('#pf').oninput = () => { $('#pf').dataset.dirty = '1'; };
+  $('#pf').onsubmit = async (e) => {
+    e.preventDefault();
+    const c = (id) => Math.round(parseFloat($(id).value.replace(/[$,\s]/g, '')) * 100);
+    const vals = [c('#pNew'), c('#pRet'), c('#pSpr')];
+    if (vals.some((v) => !(v >= 100 && v <= 100000))) return showMsg($('#pmsg'), 'Prices must be between $1 and $1,000.');
+    $('#psave').disabled = true;
+    const { error } = await sb.rpc('set_prices', { p_new: vals[0], p_returning: vals[1], p_spring: vals[2] });
+    $('#psave').disabled = false;
+    if (error) return showMsg($('#pmsg'), error.message);
+    delete $('#pf').dataset.dirty;
+    showMsg($('#pmsg'), 'Prices saved. Online checkout uses them right away (update the prices on the Join page text too, with Edit page).', true);
+  };
   loadCode();
   $('#crand').onclick = () => {
     const cur = $('#codeNow').textContent;
@@ -487,19 +589,33 @@ boot('admin').then(({ profile }) => {
     const emails = [...new Set($('#emails').value.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))];
     if (!emails.length) return showMsg($('#amsg'), 'No valid emails found.');
     const before = new Set(approved.map((a) => a.email));
-    const rows = emails.filter((x) => !before.has(x)).map((email) => ({ email, note: $('#note').value.trim() || null, added_by: profile.email }));
-    if (rows.length) {
-      const { error } = await sb.from('approved_emails').insert(rows);
-      if (error) return showMsg($('#amsg'), error.message);
+    const plan = $('#plan').value, note = $('#note').value.trim() || null;
+    $('#asave').disabled = true;
+    let failed = 0;
+    for (let i = 0; i < emails.length; i += 6) {
+      const res = await Promise.all(emails.slice(i, i + 6).map((email) => sb.rpc('set_membership', { p_email: email, p_membership: plan, p_note: note })));
+      failed += res.filter((r) => r.error).length;
     }
-    const skipped = emails.length - rows.length;
-    showMsg($('#amsg'), `Approved ${rows.length} email${rows.length === 1 ? '' : 's'}${skipped ? ` (${skipped} already on the list)` : ''}.`, true);
+    $('#asave').disabled = false;
+    const renewed = emails.filter((x) => before.has(x)).length, added = emails.length - renewed - failed;
+    showMsg($('#amsg'), [added && `Approved ${added} email${added === 1 ? '' : 's'}`, renewed && `renewed ${renewed}`, failed && `${failed} failed`].filter(Boolean).join(', ')
+      + ` — ${planName(plan).toLowerCase()} through ${fmtDay(seasonEnd())}.`, !failed);
+    // Renewed members with a card: refresh their wallet pass so it shows the new date
+    for (const email of emails.filter((x) => before.has(x))) {
+      const m = members.find((x) => x.email === email);
+      if (m) fnCall({ kind: 'sync-member', userId: m.id }).catch(() => {});
+    }
     $('#emails').value = ''; load();
   };
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     let res;
-    if (b.dataset.unapprove) {
+    if (b.dataset.ev) return toggleEvent(b);
+    if (b.dataset.renew) {
+      if (!confirm(`Renew ${b.dataset.name} as a full-year member through ${fmtDay(seasonEnd())}?`)) return;
+      res = await sb.rpc('set_membership', { p_email: b.dataset.renew, p_membership: 'full', p_note: 'Renewed by ' + profile.email });
+      if (!res.error) fnCall({ kind: 'sync-member', userId: members.find((m) => m.email === b.dataset.renew)?.id }).catch(() => {});
+    } else if (b.dataset.unapprove) {
       if (!confirm(`Remove ${b.dataset.unapprove} from the approved list? (Existing accounts are not deleted.)`)) return;
       res = await sb.from('approved_emails').delete().eq('email', b.dataset.unapprove);
     } else if (b.dataset.del) {
@@ -520,6 +636,7 @@ boot('admin').then(({ profile }) => {
 page('scan.html', 'Scan',
  hero('Check-in', 'Scan a Card', "Point the camera at a member's wallet QR code."),
  """<div class="scanner">
+  <div class="tonight" id="tonight"><span class="t-dot" aria-hidden="true"></span><span class="t-lbl">Tonight</span><b id="tName">…</b><span class="t-count"><b id="tCount">0</b> checked in</span></div>
   <div class="code-chip" id="scanCode">Check-in code: …</div>
   <div class="lookup">
     <label for="q" class="sr">Find a member by name or email</label>
@@ -570,7 +687,10 @@ boot('admin').then(() => {
   const scanner = new Html5Qrcode('reader');
   let weekCode = null, busy = false, last = null;
   const loadCode = async () => { weekCode = await getWeekCode(); if (weekCode) $('#scanCode').innerHTML = 'Real cards show <b>' + esc(weekCode.text) + '</b> in the top corner'; };
-  loadCode(); setInterval(loadCode, 60000);
+  // Tonight's party: one per day, named after the weekly word
+  const setTonight = (name, count) => { $('#tName').textContent = partyName(name); $('#tCount').textContent = count; };
+  const loadTonight = async () => { const { data } = await sb.rpc('tonight'); $('#tonight').hidden = !data; if (data) setTonight(data.name, data.count); };
+  loadCode(); loadTonight(); setInterval(() => { loadCode(); loadTonight(); }, 60000);
   // Ski-lift gate sounds (synthesized, no audio files): good = bright "bee-BEEP", bad = low double buzz
   let actx = null;
   const audio = () => {
@@ -629,6 +749,7 @@ boot('admin').then(() => {
   document.addEventListener('pointerdown', () => loadSounds(), { once: true });
   window.testSound = beep;
   const row = (k, v) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
+  const ordinal = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
   const ICON = { ok: '✓', warn: '!', bad: '✕', look: '⌕' };
 
   function show(state, title, sub, m, photo) {
@@ -659,10 +780,11 @@ boot('admin').then(() => {
     $('#shName').textContent = m.name;
     $('#shNum').textContent = numLine(m);
     $('#shProfile').innerHTML =
+      row('Membership', membershipText(m.membership, m.memberUntil)) +
       row('Email', m.email) +
       row('Member since', m.since ? new Date(m.since).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—') +
       row('Last scanned', r.lastScan ? fmtTime(r.lastScan) + (r.lastScannedBy ? ' by ' + r.lastScannedBy : '') : 'Never (this is the first)') +
-      row('Check-ins', r.totalScans + ' total' + (r.scansLast24h ? ` · ${r.scansLast24h + 1} in the last 24 h` : '')) +
+      row('Parties', (r.eventsAttended ?? 0) + ' attended') +
       row('Role', m.isAdmin ? 'Exec board / admin' : 'Member');
     $('#shCode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> in the top corner, a live ticking clock on the website card, and match this photo.' : 'Make sure the photo matches the person.';
     const look = state === 'look';
@@ -683,10 +805,15 @@ boot('admin').then(() => {
     if (!r.valid) return bad(r.error);
     const m = r.member;
     const photo = await signedPhoto(m.id).catch(() => null);
-    if (r.scannedWithin24h) show('warn', 'Already checked in', 'Valid member, but this card was scanned ' + fmtTime(r.lastScan).split(' · ')[1] + (r.lastScannedBy ? ' by ' + r.lastScannedBy : '') + '.', m, photo);
-    else show('ok', 'Valid member', r.lastScan ? 'First check-in today.' : 'First check-in ever — welcome!', m, photo);
+    const party = partyName(r.event?.name) + ' party';
+    if (r.event) setTonight(r.event.name, r.event.count);
+    const active = r.active !== false, already = r.alreadyIn ?? r.scannedWithin24h;
+    const ok = active && !already;
+    if (!active) show('bad', 'Membership expired', `Ended ${fmtDay(r.memberUntil)}. They can renew on the Join page.`, m, photo);
+    else if (already) show('warn', 'Already checked in', `Checked in${r.event ? ' to tonight’s ' + party : ''} at ${new Date(r.checkedInAt || r.lastScan).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` + ((r.checkedInBy ?? r.lastScannedBy) ? ' by ' + (r.checkedInBy ?? r.lastScannedBy) : '') + '.', m, photo);
+    else show('ok', 'Checked in', !r.event ? 'Valid member.' : `${party} · #${r.event.count} tonight` + (r.eventsAttended === 1 ? ' · first party — welcome!' : ` · their ${ordinal(r.eventsAttended)} party`), m, photo);
     last.r = r;
-    beep(!r.scannedWithin24h);
+    beep(ok);
   }
 
   function next() {
@@ -733,11 +860,12 @@ boot('admin').then(() => {
   const loadMembers = async () => {
     if (members) return members;
     const [{ data: profs }, { data: stats }] = await Promise.all([
-      sb.from('profiles').select('id,name,email,is_admin,serial,member_no,created_at'),
+      sb.from('profiles').select('id,name,email,is_admin,serial,member_no,created_at,membership,member_until'),
       sb.rpc('admin_members'),
     ]);
     const st = Object.fromEntries((stats || []).map((s) => [s.id, s]));
-    members = (profs || []).map((p) => ({ ...p, last_scan: st[p.id]?.last_scan || null, scan_count: st[p.id]?.scan_count || 0 }));
+    members = (profs || []).map((p) => ({ ...p, last_scan: st[p.id]?.last_scan || null, scan_count: st[p.id]?.scan_count || 0,
+      events_attended: st[p.id]?.events_attended || 0, in_tonight: !!st[p.id]?.in_tonight }));
     return members;
   };
   const norm = (s) => (s || '').toLowerCase();
@@ -759,8 +887,9 @@ boot('admin').then(() => {
     return i < 0 ? esc(text) : esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
   };
   const statusOf = (m) => {
+    if (!memberActive(m.member_until)) return ['expired', 'Expired'];
+    if (m.in_tonight) return ['today', 'In tonight'];
     if (!m.last_scan) return ['new', 'Never in'];
-    if (Date.now() - Date.parse(m.last_scan) < 864e5) return ['today', 'In today'];
     return ['', fmtTime(m.last_scan).split(' · ').pop()];
   };
   let hitIds = [], active = -1;
@@ -802,11 +931,11 @@ boot('admin').then(() => {
   let looked = null;
   async function lookup(p) {
     looked = p;
-    const m = { id: p.id, name: p.name, email: p.email, isAdmin: p.is_admin, memberNo: p.member_no, since: p.created_at };
+    const m = { id: p.id, name: p.name, email: p.email, isAdmin: p.is_admin, memberNo: p.member_no, since: p.created_at, membership: p.membership, memberUntil: p.member_until };
     const photo = await signedPhoto(p.id).catch(() => null);
-    const day = p.last_scan && Date.now() - Date.parse(p.last_scan) < 864e5;
-    last = { state: 'look', title: day ? 'Member · already in today' : 'Member lookup', m, photo,
-      r: { lastScan: p.last_scan, lastScannedBy: null, totalScans: p.scan_count, scansLast24h: 0 } };
+    const title = !memberActive(p.member_until) ? 'Membership expired' : p.in_tonight ? 'Member · already in tonight' : 'Member lookup';
+    last = { state: 'look', title, m, photo,
+      r: { lastScan: p.last_scan, lastScannedBy: null, totalScans: p.scan_count, eventsAttended: p.events_attended } };
     busy = true; try { scanner.pause(true); } catch {}
     openInfo();
   }

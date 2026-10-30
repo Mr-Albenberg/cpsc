@@ -131,6 +131,32 @@ Without this, Android passes come from WalletWallet's free plan, which can't sho
 
 Members who already added the WalletWallet version get the new pass by tapping **Add to Google Wallet** again; the old one is voided automatically.
 
+## Memberships, parties and dues
+
+**Memberships.** Every membership — full year or spring — is valid through **June 30** of the school year (a couple of
+weeks past spring finals). Anything paid or approved from June 1 on counts toward the next school year. After June 30
+the card scans as *Membership expired*, the member's card page shows a **Renew** button, and Apple/Google Wallet
+mark the pass expired. Admins can renew anyone from the Members page (or re-approve their email).
+
+**Parties (check-in).** There is one party per day, named after that day's check-in word. The scanner checks each
+member in once per party; scans from 6am to 6am count toward the same night. Changing the weekly word renames
+tonight's party. The Members page lists every party with who came.
+
+**Paying dues online (Stripe).** The Join page takes payment with Stripe Checkout (card, Apple Pay, Google Pay).
+A paid checkout approves the email automatically (new members) or extends the membership and updates the wallet pass
+(renewals). Prices are set on the Members page → Dues. Until Stripe is set up, the Join page links to cpsconline.com.
+
+1. Create the club's Stripe account at stripe.com (use test mode first).
+2. Supabase → Edge Functions → **Secrets**: add `STRIPE_SECRET_KEY` (Stripe → Developers → API keys → Secret key).
+3. Stripe → Developers → **Webhooks** → Add endpoint:
+   `https://<project>.supabase.co/functions/v1/wallet?stripe-webhook`, event `checkout.session.completed`
+   (and `checkout.session.async_payment_succeeded`). Copy its signing secret into the Supabase secret
+   `STRIPE_WEBHOOK_SECRET`. (Payments also confirm when the member returns to the site; the webhook covers people
+   who close the tab.)
+4. Test with card `4242 4242 4242 4242`, then switch both keys to live mode.
+
+Database: run `supabase/migrations/010_memberships_events_payments.sql` in the SQL Editor (after 009).
+
 ## Save points
 `save-point-2026-10-30` (a branch on GitHub) is the site exactly as it was before the futuristic design pass. To go back to it:
 `git checkout main && git reset --hard origin/save-point-2026-10-30 && git push --force-with-lease origin main`

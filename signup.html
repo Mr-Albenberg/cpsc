@@ -39,6 +39,9 @@
 <script src="assets/fx.js" defer></script>
 <script>
 boot('guest').then(() => {
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('email')) $('#email').value = qs.get('email');   // coming from paying online
+  if (qs.get('name')) $('#name').value = qs.get('name');
   $('#photo').onchange = (e) => {
     const f = e.target.files[0];
     if (f) { $('#preview').style.backgroundImage = 'url(' + URL.createObjectURL(f) + ')'; $('#preview').style.borderStyle = 'solid'; }

@@ -6,6 +6,7 @@
 <section class="hero"><div class="eyebrow">Check-in</div><h1>Scan a Card</h1><p>Point the camera at a member's wallet QR code.</p></section>
 <main>
 <div class="scanner">
+  <div class="tonight" id="tonight"><span class="t-dot" aria-hidden="true"></span><span class="t-lbl">Tonight</span><b id="tName">…</b><span class="t-count"><b id="tCount">0</b> checked in</span></div>
   <div class="code-chip" id="scanCode">Check-in code: …</div>
   <div class="lookup">
     <label for="q" class="sr">Find a member by name or email</label>
@@ -77,7 +78,10 @@ boot('admin').then(() => {
   const scanner = new Html5Qrcode('reader');
   let weekCode = null, busy = false, last = null;
   const loadCode = async () => { weekCode = await getWeekCode(); if (weekCode) $('#scanCode').innerHTML = 'Real cards show <b>' + esc(weekCode.text) + '</b> in the top corner'; };
-  loadCode(); setInterval(loadCode, 60000);
+  // Tonight's party: one per day, named after the weekly word
+  const setTonight = (name, count) => { $('#tName').textContent = partyName(name); $('#tCount').textContent = count; };
+  const loadTonight = async () => { const { data } = await sb.rpc('tonight'); $('#tonight').hidden = !data; if (data) setTonight(data.name, data.count); };
+  loadCode(); loadTonight(); setInterval(() => { loadCode(); loadTonight(); }, 60000);
   // Ski-lift gate sounds (synthesized, no audio files): good = bright "bee-BEEP", bad = low double buzz
   let actx = null;
   const audio = () => {
@@ -136,6 +140,7 @@ boot('admin').then(() => {
   document.addEventListener('pointerdown', () => loadSounds(), { once: true });
   window.testSound = beep;
   const row = (k, v) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
+  const ordinal = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
   const ICON = { ok: '✓', warn: '!', bad: '✕', look: '⌕' };
 
   function show(state, title, sub, m, photo) {
@@ -166,10 +171,11 @@ boot('admin').then(() => {
     $('#shName').textContent = m.name;
     $('#shNum').textContent = numLine(m);
     $('#shProfile').innerHTML =
+      row('Membership', membershipText(m.membership, m.memberUntil)) +
       row('Email', m.email) +
       row('Member since', m.since ? new Date(m.since).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—') +
       row('Last scanned', r.lastScan ? fmtTime(r.lastScan) + (r.lastScannedBy ? ' by ' + r.lastScannedBy : '') : 'Never (this is the first)') +
-      row('Check-ins', r.totalScans + ' total' + (r.scansLast24h ? ` · ${r.scansLast24h + 1} in the last 24 h` : '')) +
+      row('Parties', (r.eventsAttended ?? 0) + ' attended') +
       row('Role', m.isAdmin ? 'Exec board / admin' : 'Member');
     $('#shCode').innerHTML = weekCode ? 'Their card should show <b>' + esc(weekCode.text) + '</b> in the top corner, a live ticking clock on the website card, and match this photo.' : 'Make sure the photo matches the person.';
     const look = state === 'look';
@@ -190,10 +196,15 @@ boot('admin').then(() => {
     if (!r.valid) return bad(r.error);
     const m = r.member;
     const photo = await signedPhoto(m.id).catch(() => null);
-    if (r.scannedWithin24h) show('warn', 'Already checked in', 'Valid member, but this card was scanned ' + fmtTime(r.lastScan).split(' · ')[1] + (r.lastScannedBy ? ' by ' + r.lastScannedBy : '') + '.', m, photo);
-    else show('ok', 'Valid member', r.lastScan ? 'First check-in today.' : 'First check-in ever — welcome!', m, photo);
+    const party = partyName(r.event?.name) + ' party';
+    if (r.event) setTonight(r.event.name, r.event.count);
+    const active = r.active !== false, already = r.alreadyIn ?? r.scannedWithin24h;
+    const ok = active && !already;
+    if (!active) show('bad', 'Membership expired', `Ended ${fmtDay(r.memberUntil)}. They can renew on the Join page.`, m, photo);
+    else if (already) show('warn', 'Already checked in', `Checked in${r.event ? ' to tonight’s ' + party : ''} at ${new Date(r.checkedInAt || r.lastScan).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` + ((r.checkedInBy ?? r.lastScannedBy) ? ' by ' + (r.checkedInBy ?? r.lastScannedBy) : '') + '.', m, photo);
+    else show('ok', 'Checked in', !r.event ? 'Valid member.' : `${party} · #${r.event.count} tonight` + (r.eventsAttended === 1 ? ' · first party — welcome!' : ` · their ${ordinal(r.eventsAttended)} party`), m, photo);
     last.r = r;
-    beep(!r.scannedWithin24h);
+    beep(ok);
   }
 
   function next() {
@@ -240,11 +251,12 @@ boot('admin').then(() => {
   const loadMembers = async () => {
     if (members) return members;
     const [{ data: profs }, { data: stats }] = await Promise.all([
-      sb.from('profiles').select('id,name,email,is_admin,serial,member_no,created_at'),
+      sb.from('profiles').select('id,name,email,is_admin,serial,member_no,created_at,membership,member_until'),
       sb.rpc('admin_members'),
     ]);
     const st = Object.fromEntries((stats || []).map((s) => [s.id, s]));
-    members = (profs || []).map((p) => ({ ...p, last_scan: st[p.id]?.last_scan || null, scan_count: st[p.id]?.scan_count || 0 }));
+    members = (profs || []).map((p) => ({ ...p, last_scan: st[p.id]?.last_scan || null, scan_count: st[p.id]?.scan_count || 0,
+      events_attended: st[p.id]?.events_attended || 0, in_tonight: !!st[p.id]?.in_tonight }));
     return members;
   };
   const norm = (s) => (s || '').toLowerCase();
@@ -266,8 +278,9 @@ boot('admin').then(() => {
     return i < 0 ? esc(text) : esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
   };
   const statusOf = (m) => {
+    if (!memberActive(m.member_until)) return ['expired', 'Expired'];
+    if (m.in_tonight) return ['today', 'In tonight'];
     if (!m.last_scan) return ['new', 'Never in'];
-    if (Date.now() - Date.parse(m.last_scan) < 864e5) return ['today', 'In today'];
     return ['', fmtTime(m.last_scan).split(' · ').pop()];
   };
   let hitIds = [], active = -1;
@@ -309,11 +322,11 @@ boot('admin').then(() => {
   let looked = null;
   async function lookup(p) {
     looked = p;
-    const m = { id: p.id, name: p.name, email: p.email, isAdmin: p.is_admin, memberNo: p.member_no, since: p.created_at };
+    const m = { id: p.id, name: p.name, email: p.email, isAdmin: p.is_admin, memberNo: p.member_no, since: p.created_at, membership: p.membership, memberUntil: p.member_until };
     const photo = await signedPhoto(p.id).catch(() => null);
-    const day = p.last_scan && Date.now() - Date.parse(p.last_scan) < 864e5;
-    last = { state: 'look', title: day ? 'Member · already in today' : 'Member lookup', m, photo,
-      r: { lastScan: p.last_scan, lastScannedBy: null, totalScans: p.scan_count, scansLast24h: 0 } };
+    const title = !memberActive(p.member_until) ? 'Membership expired' : p.in_tonight ? 'Member · already in tonight' : 'Member lookup';
+    last = { state: 'look', title, m, photo,
+      r: { lastScan: p.last_scan, lastScannedBy: null, totalScans: p.scan_count, eventsAttended: p.events_attended } };
     busy = true; try { scanner.pause(true); } catch {}
     openInfo();
   }

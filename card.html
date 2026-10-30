@@ -7,11 +7,14 @@
 <main>
 <div class="grid">
   <div class="panel">
+    <div class="notice bad" id="expired" hidden><strong id="expTitle">Your membership has ended</strong><span id="expText"></span>
+      <div class="btn-row" style="margin-top:10px"><a class="btn" id="renewBtn" href="join.html#pay">Renew membership</a></div></div>
     <div class="notice" id="needPhoto" style="display:none"><strong>Add your photo to finish your card</strong>Admins see it when they scan you in. Use "Choose photo" on this page.</div>
     <div class="member-card">
       <div class="top"><img class="card-logo" src="img/logo-white.png" alt="CPSC"><small>MEMBERSHIP CARD</small></div>
       <div class="who"><img id="photo" alt=""><div><div class="label" id="role">MEMBER</div><div class="name" id="name"></div><div class="memno" id="memno"></div></div></div>
-      <div class="qr"><div id="qr"></div></div>
+      <div class="valid-line" id="validLine"></div>
+      <div class="qr"><div id="qr"></div><div class="qr-stamp" aria-hidden="true">Expired</div></div>
       <div class="live-strip" id="live">
         <div class="live-row"><span class="live-dot"></span><span>LIVE</span><span class="live-clock" id="liveClock">--:--:--</span></div>
         <div class="live-code" id="liveCode">…</div>
@@ -39,6 +42,7 @@
   <div class="panel">
     <h2>Profile</h2>
     <p class="muted" id="email"></p>
+    <div class="plan-box" id="planBox"></div>
     <label>Photo</label>
     <div class="photo-pick"><label for="newphoto" class="btn ghost small" style="margin:0">Choose photo</label><input type="file" id="newphoto" accept="image/*"></div>
     <div class="msg" id="msg"></div>
@@ -158,6 +162,18 @@ boot('member').then(async (ctx) => {
   const yr = new Date(p.created_at).getFullYear();
   if (p.member_no) $('#memno').textContent = 'MEMBER #' + String(p.member_no).padStart(4, '0') + (yr ? ' · SINCE ' + yr : '');
   new QRCode($('#qr'), { text: 'CPSC1:' + p.serial, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+  // Membership: valid through June 30 of the school year
+  const active = memberActive(p.member_until);
+  $('#validLine').textContent = p.member_until ? (active ? `${planName(p.membership)} · valid thru ${fmtDay(p.member_until)}` : `Expired ${fmtDay(p.member_until)}`) : '';
+  document.querySelector('.member-card').classList.toggle('expired', !active);
+  $('#planBox').hidden = !p.member_until;
+  $('#planBox').innerHTML = `<b>${esc(planName(p.membership))} membership</b><span>${esc(membershipText(p.membership, p.member_until))}</span>`;
+  if (!active) {
+    $('#expired').hidden = false;
+    $('#expText').textContent = p.member_until ? `It ended ${fmtDay(p.member_until, true)}, so your card won’t check you in until you renew. Renewing keeps the same card — no need to re-add it to your wallet.` : 'Your card won’t check you in until you have a membership.';
+    $('#renewBtn').href = 'join.html?renew=1#pay';
+  }
+  if (new URLSearchParams(location.search).has('renewed')) showMsg($('#wmsg'), `You’re renewed through ${fmtDay(p.member_until, true)}. Your wallet card updates on its own.`, true);
   loadPhoto();
 
   const ua = navigator.userAgent;

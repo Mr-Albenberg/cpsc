@@ -61,18 +61,26 @@ export async function currentCode(): Promise<{ word: string; emoji: string; text
   return { word, emoji: '', text: titleCase(word) };
 }
 
-function season() {
+// The school year a membership belongs to, e.g. 2026–27 (ends June 30, 2027)
+function season(p?: Profile) {
+  if (p?.member_until) { const y = +p.member_until.slice(0, 4); return `${y - 1}–${String(y).slice(2)}`; }
   const now = new Date();
-  const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1; // season starts in summer
+  const y = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1; // June 1 starts the next school year
   return `${y}–${String(y + 1).slice(2)}`;
 }
+// "Jun 30, 2027" — the last day the card scans as valid
+const validThru = (p: Profile) => (p.member_until
+  ? new Date(p.member_until + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+  : '');
+const expiresAt = (p: Profile) => (p.member_until ? `${p.member_until}T23:59:59-07:00` : null);
+const planLabel = (p: Profile) => (p.membership === 'spring' ? 'Spring' : 'Full year');
 
 const memberNo = (p: Profile) => (p.member_no ? '#' + String(p.member_no).padStart(4, '0') : '');
 const CLUB = 'https://cpsconline.com';
 
 // Bump LAYOUT when the pass design changes so existing passes get the new look on their next update.
-const LAYOUT = 'L5';
-export const sigOf = (p: Profile, code: string) => [LAYOUT, p.name, memberNo(p), p.is_admin ? 'exec' : 'member', code].join('|');
+const LAYOUT = 'L6';
+export const sigOf = (p: Profile, code: string) => [LAYOUT, p.name, memberNo(p), p.is_admin ? 'exec' : 'member', code, p.membership, p.member_until].join('|');
 
 export function wwBody(p: Profile, code: string, thumbUri?: string) {
   const no = memberNo(p);
@@ -91,8 +99,8 @@ export function wwBody(p: Profile, code: string, thumbUri?: string) {
     primaryFields: [{ label: 'LIVE TO SKI, LOVE TO PARTY', value: p.name }],
     secondaryFields: [
       ...(no ? [{ label: p.is_admin ? 'EXEC BOARD' : 'MEMBER', value: no }] : []),
-      { label: 'SEASON', value: season() },
-      { label: 'SINCE', value: String(new Date(p.created_at).getFullYear()) },
+      { label: p.membership === 'spring' ? 'SPRING' : 'SEASON', value: season(p) },
+      ...(p.member_until ? [{ label: 'VALID THRU', value: validThru(p) }] : []),
     ],
     barcodeValue: QR(p.serial),
     barcodeFormat: 'QR',
@@ -290,8 +298,9 @@ async function siteImage(name: string) {
 type Profile = {
   id: string; email: string; name: string; serial: string; created_at: string; wallet_serial?: string | null;
   member_no?: number | null; is_admin?: boolean; pass_updated_at?: string; pass_test_code?: string | null;
+  membership?: string | null; member_until?: string | null;
 };
-const PROFILE_COLS = 'id,email,name,serial,created_at,wallet_serial,member_no,is_admin,pass_updated_at,pass_test_code';
+const PROFILE_COLS = 'id,email,name,serial,created_at,wallet_serial,member_no,is_admin,pass_updated_at,pass_test_code,membership,member_until';
 
 const PASS_TYPE = () => env('APPLE_PASS_TYPE_ID');
 const WEB_SERVICE_URL = () => `${SUPABASE_URL}/functions/v1/wallet`;
@@ -337,9 +346,10 @@ export async function buildApplePass(p: Profile, thumb: Buffer | null, code: str
         ? [{ key: 'status', label: 'STATUS', value: 'Membership ended' }]
         : [
             ...(no ? [{ key: 'no', label: p.is_admin ? 'EXEC BOARD' : 'MEMBER', value: no }] : []),
-            { key: 'season', label: 'SEASON', value: season() },
-            { key: 'since', label: 'SINCE', value: String(new Date(p.created_at).getFullYear()) },
+            { key: 'season', label: p.membership === 'spring' ? 'SPRING' : 'SEASON', value: season(p) },
+            ...(p.member_until ? [{ key: 'thru', label: 'VALID THRU', value: validThru(p) }] : []),
           ],
+      backFields: p.member_until ? [{ key: 'plan', label: 'MEMBERSHIP', value: `${planLabel(p)} · valid through ${validThru(p)}. Renew at ${SITE_URL || CLUB}/join.html` }] : [],
     },
     // iOS 27+ poster layout: full-bleed club artwork (skier + CPSC logo in lime), word top right,
     // name and member info on the strip by the QR code. Older iPhones use `generic` above.
@@ -348,15 +358,16 @@ export async function buildApplePass(p: Profile, thumb: Buffer | null, code: str
       // name on the left, season on the right of the same row
       primaryFields: [
         { key: 'name', label: 'LIVE TO SKI, LOVE TO PARTY', value: p.name },
-        ...(voided ? [] : [{ key: 'season', label: 'SEASON', value: season(), textAlignment: 'PKTextAlignmentRight' }]),
+        ...(voided ? [] : [{ key: 'season', label: p.membership === 'spring' ? 'SPRING' : 'SEASON', value: season(p), textAlignment: 'PKTextAlignmentRight' }]),
       ],
       footerFields: voided
         ? [{ key: 'status', value: 'Membership ended' }]
-        : [{ key: 'info', value: [no, p.is_admin ? 'Exec Board' : 'Member'].filter(Boolean).join(' · ') }],
+        : [{ key: 'info', value: [no, p.is_admin ? 'Exec Board' : 'Member', p.member_until ? 'Thru ' + validThru(p) : ''].filter(Boolean).join(' · ') }],
     },
     barcodes: [{ format: 'PKBarcodeFormatQR', message: QR(voided ? 'void' : p.serial), messageEncoding: 'iso-8859-1' }],
   };
   if (voided) passJson.voided = true;
+  else if (expiresAt(p)) passJson.expirationDate = expiresAt(p); // Wallet shows "Expired" after the school year
   const icon = await siteImage('apple-touch-icon.png');
   const files: Record<string, Buffer> = {
     'pass.json': Buffer.from(JSON.stringify(passJson)),
@@ -389,7 +400,7 @@ async function settingsInfo() {
 }
 const ms = (t?: string | null) => (t ? Date.parse(t) : 0);
 // Bump this (to the current time) whenever the pass design changes; phones then fetch the new look.
-const DESIGN_AT = Date.parse('2026-10-29T20:25:00Z');
+const DESIGN_AT = Date.parse('2026-10-31T00:30:00Z');
 
 // The pass for a serial, as of now (null if it never existed)
 async function applePassBySerial(serial: string): Promise<{ buf: Buffer; modified: number } | null> {
@@ -629,8 +640,10 @@ function googleObject(p: Profile, code: string, voided = false) {
     textModulesData: [
       { id: 'no', header: p.is_admin ? 'EXEC BOARD' : 'MEMBER', body: voided ? 'Ended' : (memberNo(p) || 'Member') },
       { id: 'code', header: 'CHECK-IN', body: voided ? '—' : code },
-      { id: 'season', header: 'SEASON', body: season() },
+      { id: 'season', header: p.membership === 'spring' ? 'SPRING' : 'SEASON', body: season(p) },
+      ...(p.member_until && !voided ? [{ id: 'thru', header: 'VALID THRU', body: validThru(p) }] : []),
     ],
+    ...(expiresAt(p) && !voided ? { validTimeInterval: { end: { date: expiresAt(p) } } } : {}),
     barcode: { type: 'QR_CODE', value: QR(voided ? 'void' : p.serial) },
     linksModuleData: { uris: [{ uri: SITE_URL + '/card.html', description: 'My CPSC card', id: 'card' }, { uri: CLUB, description: 'cpsconline.com', id: 'club' }] },
   };
@@ -685,6 +698,138 @@ export async function googleRefreshAll() {
   return { updated, failed };
 }
 
+// ---------- Dues: Stripe Checkout (the club's own Stripe account) ----------
+// New members pay on the Join page → their email is approved automatically. Members renewing get
+// their card extended and their wallet pass updated. Card details never touch this site.
+const STRIPE_KEY = env('STRIPE_SECRET_KEY');
+export const stripeReady = () => !!STRIPE_KEY;
+const PLANS: Record<string, { label: string; col: string; membership: 'full' | 'spring' }> = {
+  new: { label: 'Full-year membership', col: 'price_new_cents', membership: 'full' },
+  returning: { label: 'Full-year membership (returning member)', col: 'price_returning_cents', membership: 'full' },
+  spring: { label: 'Spring membership', col: 'price_spring_cents', membership: 'spring' },
+};
+const pacificMonth = () => +new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'numeric' });
+export const springOpen = () => pacificMonth() <= 5;               // spring memberships: January through May
+const fmtDay = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+async function membershipEnd(): Promise<string> {
+  const { data, error } = await db.rpc('membership_end');
+  if (error || !data) throw new Error('Could not work out the membership dates.');
+  return data as string;
+}
+async function duesPrices() {
+  const { data } = await db.from('club_settings').select('price_new_cents,price_returning_cents,price_spring_cents').eq('id', 1).maybeSingle();
+  return { new: data?.price_new_cents ?? 5569, returning: data?.price_returning_cents ?? 5069, spring: data?.price_spring_cents ?? 2569 };
+}
+async function stripe(path: string, params?: Record<string, string>) {
+  const r = await fetch('https://api.stripe.com/v1/' + path, {
+    method: params ? 'POST' : 'GET',
+    headers: { Authorization: `Bearer ${STRIPE_KEY}`, ...(params ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
+    body: params ? new URLSearchParams(params) : undefined,
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { console.error('Stripe error', r.status, d?.error?.message); throw new Error('PAY:' + (d?.error?.message || 'The payment service had a problem.')); }
+  return d;
+}
+const allowedOrigins = () => [...new Set([SITE_URL && new URL(SITE_URL).origin, 'https://cpsconline.vercel.app', 'https://cpsc-ten.vercel.app',
+  'https://mr-albenberg.github.io', ...env('EXTRA_ORIGINS').split(',').filter(Boolean)].filter(Boolean))];
+const payErr = (msg: string, status = 400) => json({ error: msg }, status);
+
+async function startCheckout(body: Record<string, unknown>) {
+  if (!stripeReady()) return payErr('Paying online isn’t switched on yet.', 503);
+  const email = String(body.email || '').trim().toLowerCase();
+  const name = String(body.name || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  const planKey = String(body.plan || '');
+  const plan = PLANS[planKey];
+  if (!plan) return payErr('Pick a membership.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return payErr('Type a valid email.');
+  if (name.length < 2) return payErr('Type your name.');
+  if (planKey === 'spring' && !springOpen()) return payErr('Spring memberships are sold January through May.');
+  let ret: URL;
+  try { ret = new URL(String(body.returnUrl || '')); } catch { return payErr('Bad return page.'); }
+  if (!allowedOrigins().includes(ret.origin)) return payErr('Bad return page.');
+  const until = await membershipEnd();
+  const [{ data: approved }, { data: prof }] = await Promise.all([
+    db.from('approved_emails').select('member_until').eq('email', email).maybeSingle(),
+    db.from('profiles').select('id').eq('email', email).maybeSingle(),
+  ]);
+  if (approved?.member_until && approved.member_until >= until) return payErr(`You’re already a member through ${fmtDay(approved.member_until)} — no need to pay again.`);
+  if (planKey === 'returning' && !approved && !prof) return payErr('We couldn’t find a past membership for that email. Choose New member, or use the email you joined with before.');
+  const cents = (await duesPrices())[planKey as 'new' | 'returning' | 'spring'];
+  const page = ret.origin + ret.pathname;
+  const session = await stripe('checkout/sessions', {
+    mode: 'payment',
+    customer_email: email,
+    'line_items[0][quantity]': '1',
+    'line_items[0][price_data][currency]': 'usd',
+    'line_items[0][price_data][unit_amount]': String(cents),
+    'line_items[0][price_data][product_data][name]': `${SHORT} ${plan.label}`,
+    'line_items[0][price_data][product_data][description]': `Valid through ${fmtDay(until)}`,
+    'metadata[email]': email, 'metadata[name]': name, 'metadata[plan]': planKey, 'metadata[until]': until,
+    'payment_intent_data[description]': `${SHORT} ${plan.label} — ${name} (${email})`,
+    success_url: `${page}?paid={CHECKOUT_SESSION_ID}#pay`,
+    cancel_url: `${page}?canceled=1#pay`,
+  });
+  await db.from('payments').upsert({ session_id: session.id, email, name, plan: planKey, amount_cents: cents, status: 'pending' });
+  return json({ url: session.url });
+}
+
+// Payment went through → approve / renew, then update their wallet pass. Safe to run more than once.
+async function fulfill(session: Record<string, any>) {
+  const m = session.metadata || {};
+  const email = String(m.email || session.customer_email || '').toLowerCase();
+  const plan = PLANS[m.plan];
+  if (session.payment_status !== 'paid' || !email || !plan) return { paid: false };
+  const until = String(m.until || (await membershipEnd()));
+  const { data: pay } = await db.from('payments').select('status').eq('session_id', session.id).maybeSingle();
+  const { data: prof } = await db.from('profiles').select(PROFILE_COLS).eq('email', email).maybeSingle();
+  if (pay?.status !== 'paid') {
+    await db.from('payments').upsert({ session_id: session.id, email, name: m.name || null, plan: m.plan, amount_cents: session.amount_total ?? 0, status: 'paid', paid_at: new Date().toISOString() });
+    const { data: cur } = await db.from('approved_emails').select('member_until,note').eq('email', email).maybeSingle();
+    const keep = cur?.member_until && cur.member_until > until;
+    const row: Record<string, unknown> = {
+      email, membership: plan.membership, member_until: keep ? cur.member_until : until,
+      paid_cents: session.amount_total ?? null, paid_at: new Date().toISOString(),
+      note: `Paid online · ${plan.label} · $${((session.amount_total ?? 0) / 100).toFixed(2)}`,
+    };
+    if (!cur) row.added_by = 'Online payment';
+    const { error } = await db.from('approved_emails').upsert(row, { onConflict: 'email' });
+    if (error) { console.error('approve after payment', error); throw new Error('PAY:Your payment went through, but we couldn’t update your membership. Show this page to the exec board.'); }
+    if (prof) { // renewing member: refresh the card in their wallet
+      const p = (await profileFor((prof as Profile).id)) as Profile;
+      try {
+        if (appleReady()) await bumpAndPush(p);
+        if (googleReady()) await googleUpdate(p, p.pass_test_code || (await currentCode()).text).catch(() => false);
+        if (wwReady() && p.wallet_serial) await wwPassFor(p);
+      } catch (e) { console.error('pass refresh after payment', e); }
+    }
+  }
+  return { paid: true, email, name: m.name || '', plan: m.plan, until: fmtDay(until), hasAccount: !!prof };
+}
+
+async function checkoutStatus(body: Record<string, unknown>) {
+  if (!stripeReady()) return payErr('Paying online isn’t switched on yet.', 503);
+  const id = String(body.session || '');
+  if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(id)) return payErr('Unknown payment.');
+  return json(await fulfill(await stripe('checkout/sessions/' + id)));
+}
+
+// Stripe → us when a payment completes (covers people who close the tab before coming back)
+async function stripeWebhook(req: Request) {
+  const raw = await req.text();
+  const secretKey = env('STRIPE_WEBHOOK_SECRET');
+  const header = req.headers.get('stripe-signature') || '';
+  const t = header.match(/(?:^|,)t=(\d+)/)?.[1];
+  const sigs = [...header.matchAll(/(?:^|,)v1=([0-9a-f]+)/g)].map((x) => x[1]);
+  if (!secretKey || !t || !sigs.length || Math.abs(Date.now() / 1000 - +t) > 300) return new Response('bad signature', { status: 400 });
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secretKey), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = [...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${t}.${raw}`)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const same = (a: string) => a.length === mac.length && [...a].reduce((d, c, i) => d | (c.charCodeAt(0) ^ mac.charCodeAt(i)), 0) === 0;
+  if (!sigs.some(same)) return new Response('bad signature', { status: 400 });
+  const evt = JSON.parse(raw);
+  if (evt.type === 'checkout.session.completed' || evt.type === 'checkout.session.async_payment_succeeded') await fulfill(evt.data.object);
+  return json({ received: true });
+}
+
 // ---------- HTTP ----------
 async function profileFor(id: string) {
   const { data } = await db.from('profiles').select(PROFILE_COLS).eq('id', id).maybeSingle();
@@ -698,6 +843,14 @@ export async function handler(req: Request): Promise<Response> {
     // Apple Wallet calling back (registrations, updates) — must come before anything else
     const ws = await appleWebService(req, url);
     if (ws) return ws;
+
+    // Stripe webhook: …/functions/v1/wallet?stripe-webhook (or …/wallet/stripe-webhook)
+    if (req.method === 'POST' && (url.searchParams.has('stripe-webhook') || /stripe-webhook\/?$/.test(url.pathname))) return await stripeWebhook(req);
+
+    // Dues prices + whether paying online is on (Join page, no login needed)
+    if (req.method === 'GET' && url.searchParams.has('prices')) {
+      return json({ ready: stripeReady(), prices: await duesPrices(), springOpen: springOpen(), until: fmtDay(await membershipEnd()) });
+    }
 
     // Which wallets are switched on (used to enable the buttons on the card page)
     if (req.method === 'GET' && url.searchParams.has('status')) return json({ apple: appleReady() || wwReady(), google: googleReady() || wwReady() });
@@ -724,12 +877,15 @@ export async function handler(req: Request): Promise<Response> {
     }
 
     if (req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      // Paying dues works without an account (new members sign up after paying)
+      if (body.kind === 'checkout') return await startCheckout(body);
+      if (body.kind === 'checkout-status') return await checkoutStatus(body);
       const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
       const { data: { user } } = await db.auth.getUser(jwt);
       if (!user) return json({ error: 'Please log in again.' }, 401);
       const p = await profileFor(user.id);
       if (!p) return json({ error: 'Account not found.' }, 404);
-      const body = await req.json().catch(() => ({}));
       const kind = body.kind;
       const isAdmin = async () => !!(await db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()).data?.is_admin;
 
@@ -737,6 +893,17 @@ export async function handler(req: Request): Promise<Response> {
       if (kind === 'sync') {
         if (appleReady()) await bumpAndPush(p);
         if (wwReady() && (p.wallet_serial || (await readCache(p.id))?.serial)) await wwPassFor(p);
+        return json({ ok: true });
+      }
+      // Admin renewed someone → refresh that member's pass (new valid-through date)
+      if (kind === 'sync-member') {
+        if (!(await isAdmin())) return json({ error: 'Admins only.' }, 403);
+        const t = await profileFor(String(body.userId || ''));
+        if (t) {
+          if (appleReady()) await bumpAndPush(t);
+          if (googleReady()) await googleUpdate(t, t.pass_test_code || (await currentCode()).text).catch(() => false);
+          if (wwReady() && t.wallet_serial) await wwPassFor(t);
+        }
         return json({ ok: true });
       }
       // Admin: push the current check-in code to every pass
@@ -833,6 +1000,7 @@ export async function handler(req: Request): Promise<Response> {
     return json({ error: 'Not found' }, 404);
   } catch (e) {
     console.error(e);
+    if (e instanceof Error && e.message.startsWith('PAY:')) return json({ error: e.message.slice(4) }, 502);
     const msg = e instanceof Error && /wallet service|limit/.test(e.message) ? e.message : 'Could not build the wallet pass. Try again in a minute.';
     return json({ error: msg }, 500);
   }
