@@ -369,7 +369,6 @@ page('admin.html', 'Members',
       <label for="cword">New code word</label>
       <div class="code-input"><input type="text" id="cword" maxlength="14" autocomplete="off" placeholder="e.g. BLUEBIRD"><button type="button" class="btn ghost small" id="crand">Random</button></div>
       <button class="btn block" type="submit" id="csave">Save &amp; update all passes</button>
-      <p class="muted center" id="cnote" style="margin:10px 0 0"></p>
       <div class="msg" id="cmsg"></div>
     </form>
   </div>
@@ -507,19 +506,12 @@ async function loadDues() {
   } catch { $('#payState').textContent = 'Couldn’t check online payments right now.'; }
 }
 const CODE_WORDS = ['POWDER', 'BLUEBIRD', 'GNARLY', 'CORDUROY', 'FIRST CHAIR', 'FRESH TRACKS', 'SEND IT', 'APRES', 'FACE SHOT', 'YARD SALE', 'HOT LAPS', 'GONDOLA', 'MOGUL', 'SKI BUM', 'PARK RAT', 'TREE RUN', 'COLD SMOKE', 'SNOWBALL', 'GROOMER', 'FROSTBITE'];
-let passCount = 0;
 async function loadCode() {
   const c = await getWeekCode();
   if (!c) return;
   $('#codeNow').textContent = c.text;
   $('#codeMeta').textContent = 'Set ' + fmtTime(c.updatedAt);
-  let applePhones = 0;
-  try { const n = await fnCall({ kind: 'count' }); passCount = n.passes || 0; applePhones = n.applePhones || 0; } catch { passCount = 0; }
-  window.__applePhones = applePhones;
-  const parts = [];
-  if (applePhones) parts.push(`${applePhones} iPhone${applePhones === 1 ? '' : 's'} with the card update right away (free, no limit)`);
-  if (passCount) parts.push(`${passCount} other pass${passCount === 1 ? '' : 'es'} use ${passCount} of your 1,000 free monthly WalletWallet updates`);
-  $('#cnote').textContent = parts.length ? parts.join(' · ') + '.' : 'No one has added a wallet pass yet. The website card updates right away.';
+  fnCall({ kind: 'count' }).catch(() => {}); // also clears out any old hosted passes
 }
 boot('admin').then(({ profile }) => {
   myId = profile.id;
@@ -571,13 +563,12 @@ boot('admin').then(({ profile }) => {
       const { error } = await sb.rpc('set_week_code', { p_word: word, p_emoji: '' });
       if (error) throw new Error(error.message);
       let msg = 'Code saved. The live website card shows it now.';
-      if (passCount || window.__applePhones) {
-        $('#csave').textContent = 'Updating passes…';
+      $('#csave').textContent = 'Updating passes…';
+      try {
         const r = await fnCall({ kind: 'refresh' });
-        msg = `Code saved and ${r.updated} wallet pass${r.updated === 1 ? '' : 'es'} updated` + (r.phones ? ` (${r.phones} phone${r.phones === 1 ? '' : 's'} notified)` : '') + '.';
-        if (r.quotaHit) msg += ' Some passes weren\'t updated because the free monthly limit was reached.';
-        else if (r.failed) msg += ` ${r.failed} couldn't be updated — try saving again in a minute.`;
-      }
+        if (r.phones) msg = `Code saved and ${r.phones} wallet pass${r.phones === 1 ? '' : 'es'} updated.`;
+        if (r.failed) msg += ` ${r.failed} couldn't be updated — try saving again in a minute.`;
+      } catch (e) {}
       showMsg($('#cmsg'), msg, true);
       $('#cword').value = '';
       loadCode();

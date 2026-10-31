@@ -49,7 +49,9 @@ export const googleReady = () => !!(env('GOOGLE_ISSUER_ID') && (env('GOOGLE_SERV
 // in place and WalletWallet pushes the change to every phone that added it.
 const WW = 'https://api.walletwallet.dev';
 const WW_KEY = env('WALLETWALLET_API_KEY');
-export const wwReady = () => !!WW_KEY;
+// Retired: the club now issues only its own signed Apple passes (and Google, once set up).
+// The key is kept only so purgeWalletWallet() can delete the old hosted passes.
+export const wwReady = () => false;
 const wwHeaders = () => ({ Authorization: `Bearer ${WW_KEY}`, 'Content-Type': 'application/json' });
 type WWCache = { v: 3; serial: string; googleSaveUrl: string; token: string; passType: string; sig: string };
 
@@ -252,6 +254,30 @@ export async function wwRefreshAll() {
   }
   await Promise.all(Array.from({ length: 6 }, worker));
   return { code, total: list.length, updated, phones, failed, gone, quotaHit };
+}
+
+// Delete every hosted WalletWallet pass ever issued (voids it on the phone) and forget them.
+export async function purgeWalletWallet() {
+  const { data: hist } = await db.from('wallet_passes').select('serial,user_id').is('revoked_at', null);
+  const { data: profs } = await db.from('profiles').select('id,wallet_serial').not('wallet_serial', 'is', null);
+  const todo = new Map<string, string>();
+  for (const h of hist || []) todo.set(h.serial, h.user_id);
+  for (const p of profs || []) todo.set(p.wallet_serial, p.id);
+  if (!todo.size) return { deleted: 0, failed: 0 };
+  let deleted = 0, failed = 0;
+  for (const [serial] of todo) {
+    const r = WW_KEY ? await fetch(`${WW}/api/passes/${serial}`, { method: 'DELETE', headers: wwHeaders() }).catch(() => null) : null;
+    if (!WW_KEY || (r && (r.ok || r.status === 404))) {
+      await db.from('wallet_passes').update({ revoked_at: new Date().toISOString() }).eq('serial', serial);
+      deleted++;
+    } else failed++;
+  }
+  if (!failed) {
+    const users = [...new Set(todo.values())];
+    await db.from('profiles').update({ wallet_serial: null }).in('id', users);
+    await db.storage.from('photos').remove(users.flatMap((u) => [`${u}/wallet.json`, `${u}/pass.pkpass`]));
+  }
+  return { deleted, failed };
 }
 
 export async function wwRevoke(serial: string) {
@@ -923,12 +949,14 @@ export async function handler(req: Request): Promise<Response> {
         if (!appleReady()) return json({ error: 'Apple certificate not set up.' }, 503);
         return json(await apnsCheck());
       }
-      // Admin: how many passes exist (to show the cost of an update)
+      // Admin: how many passes exist. Also clears out any old WalletWallet passes still around.
       if (kind === 'count') {
         if (!(await isAdmin())) return json({ error: 'Admins only.' }, 403);
+        const purged = await purgeWalletWallet().catch((e) => { console.error('ww purge', e); return null; });
+        if (purged?.deleted) console.log('Deleted WalletWallet passes', purged);
         const { count } = await db.from('profiles').select('id', { count: 'exact', head: true }).not('wallet_serial', 'is', null);
         const { count: phones } = appleReady() ? await db.from('pass_registrations').select('device_id', { count: 'exact', head: true }) : { count: 0 };
-        return json({ passes: count || 0, applePhones: phones || 0 });
+        return json({ passes: count || 0, applePhones: phones || 0, wwDeleted: purged?.deleted || 0 });
       }
       // Admin: send a test word to YOUR OWN pass (or put the real code back) to check live updates
       const hasApple = appleReady() && (await tokensFor([p.serial])).length > 0;

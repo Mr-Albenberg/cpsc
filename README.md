@@ -46,7 +46,7 @@ Now sign up at `signup.html` with your email — you'll see **Members** and **Sc
 ### 5. Wallet passes
 **Free (default):** the Add to Apple / Google Wallet buttons open a short guide. Members tap **Save card image**, then add it with Apple Wallet's **Create a Pass** (iPhone, iOS 27+) or Google Wallet's **Everything else** photo pass (Android). The pass carries the same QR code, so scanning works the same.
 
-**One-tap passes for free (recommended):** sign up at walletwallet.dev, create an API key, and add it as the Edge Function secret `WALLETWALLET_API_KEY`. The buttons then add a real pass to Apple Wallet / Google Wallet in one tap (free plan: 1,000 passes/month; each member uses one). Optional secret `WALLETWALLET_COLOR`: dark, blue (default), green, red, purple or orange.
+**WalletWallet is retired.** The club issues only its own signed Apple passes (and Google Wallet passes once the club's issuer account is set up — see below). Any old hosted WalletWallet passes are deleted automatically the next time an admin opens the Members page; after that the `WALLETWALLET_API_KEY` secret can be removed.
 
 **Optional, official one-tap passes:** if you later get an Apple Developer account and/or a Google Wallet issuer account, fill in the secrets below and the buttons switch to real signed passes automatically. The `wallet` function is already deployed.
 
@@ -87,18 +87,18 @@ Admins set a code word on `admin.html` (e.g. Bluebird). It appears:
 - on the **live strip** of the website card, next to a clock ticking in seconds and a moving holographic shimmer (a screenshot freezes);
 - on the **scanner**, so door staff know what to look for.
 
-A card showing an old code, no code, or a frozen clock is a copy. Each code change uses one WalletWallet update per member who has a pass (free plan: 1,000/month), so weekly changes fit up to ~250 pass holders. Removing a member also voids their wallet pass.
+A card showing an old code, no code, or a frozen clock is a copy. Code changes update every Apple pass for free, with no limit. Removing a member also voids their wallet pass.
 
 Database: run [`supabase/migrations/002_weekly_code.sql`](supabase/migrations/002_weekly_code.sql) once in the SQL Editor (already done for the live project).
 
 **One working pass per member.** Every pass issued is recorded. Whenever a member adds their card to Apple or Google Wallet, any older CPSC pass they were issued is voided: iPhone greys it out and moves it to Expired Passes, and Google Wallet revokes it. Removing a member voids all of theirs.
 
-**Testing live updates.** On `admin.html`, *Test on your phone* sends a test word (e.g. Test 5:04 PM) to your own pass only — watch it change in Wallet without re-adding — then *Put the real code back*. Each press uses one WalletWallet update.
+**Testing live updates.** On `admin.html`, *Test on your phone* sends a test word (e.g. Test 5:04 PM) to your own pass only — watch it change in Wallet without re-adding — then *Put the real code back*.
 
 Database: also run [`supabase/migrations/003_wallet_pass_history.sql`](supabase/migrations/003_wallet_pass_history.sql) and [`004_member_numbers.sql`](supabase/migrations/004_member_numbers.sql) (already done for the live project).
 
 ## Apple Wallet with the club certificate
-iPhone passes are signed with the club's Pass Type ID **pass.com.cpsc.membership** (team 3CND973Q82): club lime, the real CPSC logo, the member's photo, and the check-in word top right. The `wallet` function also acts as Apple's PassKit web service — phones register when they add the pass, and get a push whenever the word, the member's photo, or their status changes, so nobody re-adds anything. Updates are free and unlimited. Android/Google Wallet still goes through WalletWallet.
+iPhone passes are signed with the club's Pass Type ID **pass.com.cpsc.membership** (team 3CND973Q82): club lime, the real CPSC logo, the member's photo, and the check-in word top right. The `wallet` function also acts as Apple's PassKit web service — phones register when they add the pass, and get a push whenever the word, the member's photo, or their status changes, so nobody re-adds anything. Updates are free and unlimited. Until the Google Wallet issuer account is set up, Android members use the "add from a picture" guide on their card page.
 
 Function secrets: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `APPLE_WWDR_B64`, `APPLE_SIGNER_CERT_B64`, `APPLE_SIGNER_KEY_B64` (base64 of the PEM files). The certificate expires **Nov 28, 2027** — before then, make a new Pass Type ID certificate in the Apple developer portal (a new key is fine) and replace `APPLE_SIGNER_CERT_B64` / `APPLE_SIGNER_KEY_B64`. Existing passes keep updating because their update passwords come from `pass_secrets`, not the certificate. Database: run [`005_apple_pass_updates.sql`](supabase/migrations/005_apple_pass_updates.sql) and [`006_pass_auth_secret.sql`](supabase/migrations/006_pass_auth_secret.sql).
 
@@ -106,7 +106,7 @@ Function secrets: `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `APPLE_WWDR_B64`, `APPL
 On iPhones running iOS 27 or later the pass uses Apple's poster layout: full-bleed artwork (`img/pass/background*.png` / `artwork*.png` — the CPSC skier poster recolored to club black and lime, sponsorship text removed), the lime logo top left (`img/pass/primaryLogo*.png`), the check-in word top right, and the member's name, number and season on the strip by the QR code. Older iPhones show the regular lime pass. To change the artwork, replace those PNGs (same sizes) and push; passes pick it up on their next update.
 
 ## Club branding
-The look comes from cpsconline.com: lime header (`#ecffb0`), the black CPSC mountain logo, Bebas Neue headings and buttons, Questrial text, black buttons, and the homepage group photo on the login and sign-up pages. Logo files live in `img/` (`logo.png` black, `logo-white.png` for dark backgrounds, `icon.png` square). Wallet passes use the dark preset on WalletWallet's free plan; on a paid plan they automatically switch to the club color and the real logo.
+The look comes from cpsconline.com: lime header (`#ecffb0`), the black CPSC mountain logo, Bebas Neue headings and buttons, Questrial text, black buttons, and the homepage group photo on the login and sign-up pages. Logo files live in `img/` (`logo.png` black, `logo-white.png` for dark backgrounds, `icon.png` square).
 
 ## Branding
 - Replace `img/logo.png` with the club logo (square PNG, ~512px). It's used in the header and on both wallet passes.
@@ -120,7 +120,7 @@ The look comes from cpsconline.com: lime header (`#ecffb0`), the black CPSC moun
 - If a member changes their photo they should re-add the pass.
 
 ## Google Wallet with the club's own account (Android passes that match the iPhone ones)
-Without this, Android passes come from WalletWallet's free plan, which can't show the club colors, logo or artwork. With the club's own Google Wallet issuer account (free), Android passes look like the iPhone poster pass — dark card, lime CPSC logo, skier artwork (`img/pass/google-hero.png`, `google-logo.png`), member name, member # · check-in word · season, QR code — and the check-in word, tests and removals update on the phone with no re-add (free and unlimited).
+Without this, Android members add their card from a picture (the guide on their card page). With the club's own Google Wallet issuer account (free), Android passes look like the iPhone poster pass — dark card, lime CPSC logo, skier artwork (`img/pass/google-hero.png`, `google-logo.png`), member name, member # · check-in word · season, QR code — and the check-in word, tests and removals update on the phone with no re-add (free and unlimited).
 
 1. **pay.google.com/business/console** → sign in with the club Google account → **Google Wallet API** → accept the terms. Copy the **Issuer ID** (a long number).
 2. **console.cloud.google.com** → create a project (e.g. "cpsc-wallet") → **APIs & Services → Enable APIs** → enable **Google Wallet API**.
@@ -129,7 +129,6 @@ Without this, Android passes come from WalletWallet's free plan, which can't sho
 5. Supabase → Edge Functions → **Secrets**: add `GOOGLE_ISSUER_ID` = the Issuer ID, and `GOOGLE_SERVICE_ACCOUNT` = the whole contents of the .json file (paste it as-is).
 6. In the Pay & Wallet Console, **Google Wallet API → Manage → Request publishing access** (Google reviews it, usually a few days). Until then only accounts listed under **Users / test users** can save passes, and they're marked "test".
 
-Members who already added the WalletWallet version get the new pass by tapping **Add to Google Wallet** again; the old one is voided automatically.
 
 ## Memberships, parties and dues
 
